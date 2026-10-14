@@ -1,0 +1,1451 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>코인 매매 계획판</title>
+<meta name="description" content="Bybit USDT 무기한 선물의 쉬는 구간을 보여 주고, 진입 전에 손절·수량·연속 손실을 계산하는 개인용 매매 계획 도구. 투자 조언이 아닙니다.">
+<meta name="theme-color" content="#0a0d13">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23f5a524'/%3E%3Cg fill='none' stroke='%231b1203' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M11 6v4M11 20v6M21 6v6M21 22v4'/%3E%3Crect x='8' y='10' width='6' height='10' rx='1'/%3E%3Crect x='18' y='12' width='6' height='10' rx='1'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#0a0d13; --surface:#11151e; --surface-2:#161b26; --surface-3:#1d2330;
+  --line:#222938; --line-strong:#323b4e;
+  --text:#e8ebf2; --text-2:#a7afc0; --muted:#8892a6;
+  --long:#1fc98a; --long-ink:#5fe0ad; --long-tint:rgba(31,201,138,.12); --long-line:rgba(31,201,138,.38);
+  --short:#f0465a; --short-ink:#ff8090; --short-tint:rgba(240,70,90,.12); --short-line:rgba(240,70,90,.38);
+  --accent:#f5a524; --accent-ink:#1b1203; --accent-tint:rgba(245,165,36,.12);
+  --warn:#e9b949; --warn-tint:rgba(233,185,73,.12);
+  --ema20:#f5a524; --ema50:#5b8def; --ema200:#b06cf0;
+  --r-lg:12px; --r-md:8px; --r-sm:6px;
+  --ease:cubic-bezier(.16,1,.3,1);
+  --shadow:0 12px 32px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Pretendard Variable",Pretendard,"Malgun Gothic",system-ui,sans-serif;font-size:14px;line-height:1.45;letter-spacing:-.005em;-webkit-font-smoothing:antialiased}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+::selection{background:rgba(245,165,36,.32);color:#fff}
+input{caret-color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--r-sm)}
+*{scrollbar-width:thin;scrollbar-color:var(--line-strong) transparent}
+::-webkit-scrollbar{width:8px;height:8px} ::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:8px;border:2px solid var(--surface)} ::-webkit-scrollbar-track{background:transparent}
+.num{font-variant-numeric:tabular-nums}
+.ic{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- header ---------- */
+header{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:10px 24px;padding:10px 24px;background:rgba(10,13,19,.92);backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand-mark{width:28px;height:28px;border-radius:7px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink)}
+.brand-mark .ic{width:18px;height:18px;stroke-width:2.2}
+.brand h1{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
+.brand p{margin:0;font-size:11px;color:var(--muted);white-space:nowrap}
+.status{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-2)}
+.pill{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface);white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.dot.on{background:var(--long);animation:breathe 2.4s ease-in-out infinite}
+.dot.off{background:var(--short)}
+@keyframes breathe{50%{opacity:.35}}
+.pill b{color:var(--text);font-weight:600}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-left:auto}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;padding:0 12px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);color:var(--text-2);font-size:13px;font-weight:500;white-space:nowrap;transition:background-color .15s,border-color .15s,color .15s}
+.btn:hover{background:var(--surface-2);border-color:var(--line-strong);color:var(--text)}
+.btn:active{background:var(--surface-3)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn[aria-pressed=true]{color:var(--text);border-color:var(--line-strong);background:var(--surface-2)}
+.btn[aria-pressed=true] .ic{color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:650}
+.btn.primary:hover{background:#ffb53d;border-color:#ffb53d;color:var(--accent-ink)}
+.btn.ghost{border-color:transparent;background:transparent;height:28px;padding:0 8px;font-size:12px}
+.btn.ghost:hover{background:var(--surface-2)}
+
+/* ---------- layout ---------- */
+main{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;padding:20px 24px 32px;max-width:1680px;margin:0 auto}
+.col{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);min-width:0}
+.panel-h{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:0 8px 0 16px;border-bottom:1px solid var(--line)}
+.panel-h h2{margin:0;font-size:13px;font-weight:650;display:flex;align-items:center;gap:8px}
+.count{font-size:11px;font-weight:600;color:var(--muted);background:var(--surface-3);border-radius:999px;padding:1px 7px}
+.summary{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin:0;font-size:13px;color:var(--text-2)}
+.summary b{font-weight:700}
+.summary .rule{color:var(--muted);font-size:12px}
+
+/* ---------- watchlist ---------- */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.card{position:relative;display:flex;flex-direction:column;gap:12px;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);transition:border-color .15s,background-color .15s}
+.card:hover{border-color:var(--line-strong)}
+.card.sel{border-color:var(--accent);background:var(--surface-2)}
+.card.rest > .c-price,.card.rest > .er,.card.rest > .stats{opacity:.55}
+.card:has(.pick:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.pick{position:absolute;inset:0;z-index:1;border:0;background:transparent;border-radius:var(--r-lg)}
+.pick:focus-visible{outline:none}
+.rm{position:absolute;z-index:2;top:8px;right:8px;width:26px;height:26px;display:grid;place-items:center;border:0;border-radius:var(--r-sm);background:transparent;color:var(--muted);opacity:0;transition:opacity .15s,background-color .15s,color .15s}
+.card:hover .rm,.rm:focus-visible{opacity:1}
+.rm:hover{background:var(--short-tint);color:var(--short-ink)}
+@media (hover:none){.rm{opacity:.7}}
+.c-top{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;padding-right:22px}
+.sym{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.sym span{margin-left:3px;font-size:11px;font-weight:500;color:var(--muted)}
+.chip{font-size:11px;font-weight:650;padding:2px 7px;border-radius:var(--r-sm);white-space:nowrap}
+.chip.up{background:var(--long-tint);color:var(--long-ink)}
+.chip.down{background:var(--short-tint);color:var(--short-ink)}
+.chip.rest{background:var(--surface-3);color:var(--text-2)}
+.chip.vol{background:var(--warn-tint);color:var(--warn)}
+.chip.pos{background:var(--accent-tint);color:var(--accent)}
+.c-price{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.px{font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.chg{font-size:12px;font-weight:600}
+.up{color:var(--long-ink)} .dn{color:var(--short-ink)} .wn{color:var(--warn)} .mt{color:var(--muted)}
+.er-scale{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:6px}
+.er-scale b{color:var(--text-2);font-weight:700}
+.er-bar{position:relative;height:6px;border-radius:3px;background:var(--surface-3)}
+.er-bar i{display:block;height:100%;width:0;border-radius:3px;background:var(--muted);transition:width .45s var(--ease),background-color .2s}
+.er-bar i.up{background:var(--long)} .er-bar i.down{background:var(--short)}
+.tick{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--text);border-radius:1px;opacity:.55}
+.tfrow{display:flex;justify-content:space-between;gap:6px;font-size:11px;color:var(--muted)}
+.tfrow span{display:inline-flex;align-items:center;gap:3px;white-space:nowrap}
+.tfrow span.cur{color:var(--text-2);font-weight:650}
+.tri{width:8px;height:8px;fill:currentColor;stroke:none}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px 10px;margin:0;padding-top:12px;border-top:1px solid var(--line)}
+.stats div{min-width:0}
+.stats dt{font-size:11px;color:var(--muted);margin-bottom:1px}
+.stats dd{margin:0;font-size:12px;font-weight:600;color:var(--text-2);white-space:nowrap}
+.sk{display:inline-block;height:1em;width:60%;border-radius:4px;background:linear-gradient(90deg,var(--surface-3) 0%,var(--line-strong) 50%,var(--surface-3) 100%);background-size:200% 100%;animation:sk 1.4s linear infinite;vertical-align:middle}
+@keyframes sk{to{background-position:-200% 0}}
+
+/* ---------- chart ---------- */
+.chart-title{display:flex;align-items:baseline;gap:8px}
+.chart-title span{font-size:11px;font-weight:600;color:var(--muted);background:var(--surface-3);padding:1px 6px;border-radius:4px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;padding-right:8px;font-size:11px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:12px;height:2px;border-radius:1px}
+#chart{height:440px}
+#chart .empty{height:100%}
+
+/* ---------- tabs ---------- */
+header{padding-bottom:0}
+.tabs{display:flex;gap:2px;width:100%;margin:0 -10px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{position:relative;display:inline-flex;align-items:center;gap:7px;height:42px;padding:0 14px;border:0;background:transparent;color:var(--muted);font-size:14px;font-weight:600;white-space:nowrap;transition:color .15s}
+.tab:hover{color:var(--text)}
+.tab[aria-selected=true]{color:var(--text)}
+.tab[aria-selected=true]::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2px;border-radius:2px;background:var(--accent)}
+.tab:focus-visible{outline-offset:-4px}
+.tab small{font-size:11px;font-weight:600;color:var(--muted)}
+
+/* ---------- planner ---------- */
+.pl{display:flex;flex-direction:column;gap:14px;padding:14px 16px 16px}
+.pl-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.pl-sym{font-size:15px;font-weight:700}
+.pl-sym small{margin-left:6px;font-size:12px;font-weight:500;color:var(--muted)}
+.seg{display:flex;padding:2px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--bg)}
+.seg button{height:28px;padding:0 12px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-size:13px;font-weight:650}
+.seg button[aria-pressed=true]{background:var(--surface-3);color:var(--text)}
+.seg button.long[aria-pressed=true]{background:var(--long-tint);color:var(--long-ink)}
+.seg button.short[aria-pressed=true]{background:var(--short-tint);color:var(--short-ink)}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.f{min-width:0}
+.f > label{display:block;margin-bottom:5px;font-size:12px;color:var(--text-2)}
+.inp{display:flex;align-items:center;gap:6px;height:36px;padding:0 10px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--bg);transition:border-color .15s}
+.inp:hover{border-color:var(--line-strong)}
+.inp:focus-within{border-color:var(--accent)}
+.inp input{flex:1;min-width:0;height:100%;border:0;background:transparent;outline:none;font-variant-numeric:tabular-nums}
+.inp span{font-size:12px;color:var(--muted)}
+.quick{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.quick button{height:24px;padding:0 8px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--text-2);font-size:12px;transition:border-color .15s,color .15s}
+.quick button:hover{border-color:var(--line-strong);color:var(--text)}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:1px;border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;background:var(--line)}
+.kv div{background:var(--surface-2);padding:9px 11px;min-width:0}
+.kv span{display:block;margin-bottom:2px;font-size:11px;color:var(--muted)}
+.kv b{display:block;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kv em{font-style:normal;font-size:11px;font-weight:600;color:var(--muted)}
+.wrong{padding:12px 14px;border:1px solid var(--short-line);border-radius:var(--r-md);background:var(--short-tint)}
+.wrong h3{display:flex;align-items:center;gap:6px;margin:0 0 6px;font-size:13px;font-weight:700;color:var(--short-ink)}
+.wrong p{margin:0;font-size:13px;line-height:1.6;color:var(--text)}
+.wrong p + p{margin-top:4px}
+.wrong .mt{font-size:12px}
+.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.checks li{display:flex;align-items:flex-start;gap:8px;font-size:13px;line-height:1.45}
+.checks .ic{width:15px;height:15px;margin-top:2px;stroke-width:2.4}
+.checks .ok .ic{color:var(--long)} .checks .bad .ic{color:var(--short)} .checks .warn .ic{color:var(--warn)}
+.checks .ok{color:var(--text-2)}
+.ta{width:100%;min-height:60px;resize:vertical;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--bg);color:var(--text);font:inherit;font-size:13px;line-height:1.5;transition:border-color .15s}
+.ta::placeholder{color:var(--muted)}
+.ta:focus{outline:none;border-color:var(--accent)}
+.btn.block{width:100%;height:40px}
+.btn.danger{border-color:var(--short-line);color:var(--short-ink)}
+.btn.danger:hover{background:var(--short-tint)}
+details.acct{border-top:1px solid var(--line);padding-top:12px}
+details.acct summary{display:flex;align-items:center;justify-content:space-between;cursor:pointer;list-style:none;font-size:12px;color:var(--text-2)}
+details.acct summary::-webkit-details-marker{display:none}
+details.acct summary b{font-weight:600;color:var(--text)}
+details.acct[open] summary{margin-bottom:12px}
+
+/* ---------- journal / paper ---------- */
+.jstats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin:14px 16px 4px;border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;background:var(--line)}
+.jstats div{background:var(--surface-2);padding:9px 10px}
+.jstats span{display:block;font-size:11px;color:var(--muted);margin-bottom:2px}
+.jstats b{font-size:15px;font-weight:700}
+.banner{display:flex;gap:8px;margin:12px 16px 0;padding:10px 12px;border-radius:var(--r-md);background:var(--short-tint);color:var(--short-ink);font-size:13px;line-height:1.5}
+.banner .ic{margin-top:2px}
+.list{max-height:420px;overflow:auto}
+.jrow{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:4px 12px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.jrow:last-child{border-bottom:0}
+.dirb{width:28px;height:28px;border-radius:var(--r-sm);display:grid;place-items:center;grid-row:span 2}
+.dirb.long{background:var(--long-tint);color:var(--long-ink)}
+.dirb.short{background:var(--short-tint);color:var(--short-ink)}
+.jrow .who{font-weight:650;font-size:13px}
+.jrow .who small{margin-left:6px;font-size:11px;font-weight:500;color:var(--muted)}
+.jrow .r{font-size:13px;font-weight:700;text-align:right}
+.jrow .r small,.pgrid b small{display:block;margin-top:1px;font-size:11px;font-weight:600;color:var(--muted)}
+/* 감시 상태 */
+.watch{font:inherit;font-size:12px;color:var(--text-2);cursor:pointer;transition:border-color .15s,background-color .15s}
+.watch:hover{border-color:var(--line-strong)}
+.watch b,.watch #wsTxt{font-weight:650;color:var(--text)}
+.wsub{color:var(--muted)}
+.wsub:not(:empty)::before{content:"·";margin-right:6px}
+.dot.lag{background:var(--warn)}
+.watch.warn{border-color:rgba(233,185,73,.45)}
+.watch.alarm{border-color:var(--short-line);background:var(--short-tint)}
+.watch.alarm #wsTxt{color:var(--short-ink)}
+.cond{font-size:11px;line-height:1.35;color:var(--muted);text-align:right}
+.gapnote{display:flex;gap:6px;margin:10px 0 0;padding:8px 10px;border-radius:var(--r-sm);background:var(--warn-tint);color:var(--warn);font-size:13px;line-height:1.5}
+.gapnote .ic{margin-top:2px}
+/* 용어 설명 */
+.q{display:inline-grid;place-items:center;flex:none;width:18px;height:18px;margin-left:2px;padding:0;border:1px solid var(--line-strong);border-radius:50%;background:transparent;color:var(--muted);font-size:11px;font-weight:700;line-height:1;vertical-align:1px;transition:color .15s,border-color .15s}
+.q:hover{color:var(--text);border-color:var(--text-2)}
+.lab{display:flex;align-items:center;gap:4px;margin-bottom:5px}
+.lab label{font-size:12px;color:var(--text-2)}
+.lab-h{font-size:12px;font-weight:650;color:var(--text-2)}
+.term{position:relative;z-index:2;padding:0;border:0;background:none;color:inherit;font:inherit;text-decoration:underline dotted;text-decoration-color:var(--line-strong);text-underline-offset:3px;cursor:help;transition:color .15s,text-decoration-color .15s}
+.term:hover{color:var(--text);text-decoration-color:var(--text-2)}
+.term-chip{border:0;cursor:help}
+.ph-r{display:flex;align-items:center;gap:6px}
+.panel-h > .q{margin-right:8px}
+.modal.help{width:min(520px,100%)}
+.help-b p{margin:0;font-size:14px;line-height:1.65;color:var(--text-2)}
+.help-b p b{color:var(--text)}
+.help-b ol{margin:0;padding-left:20px;font-size:14px;line-height:1.75;color:var(--text-2)}
+.help-b .term{z-index:auto;color:var(--text)}
+.ex-h{font-size:12px!important;font-weight:650;color:var(--muted)!important;margin-bottom:-6px!important}
+.ex{width:100%;border-collapse:collapse;font-size:13px}
+.ex th{padding:7px 12px 7px 0;border-bottom:1px solid var(--line);text-align:left;font-weight:500;color:var(--muted);white-space:nowrap;vertical-align:top}
+.ex td{padding:7px 0;border-bottom:1px solid var(--line);font-weight:600;color:var(--text)}
+.ex tr:last-child th,.ex tr:last-child td{border-bottom:0}
+.ex td.up{color:var(--long-ink)} .ex td.dn{color:var(--short-ink)}
+.help-b .caveat{padding:10px 12px;border-radius:var(--r-md);background:var(--warn-tint);color:var(--warn);font-size:13px}
+.legend-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--text-2)}
+.legend-list li{display:flex;align-items:flex-start;gap:8px}
+.legend-list .ic{width:15px;height:15px;margin-top:3px;stroke-width:2.4;color:var(--long)}
+.legend-list .bad .ic{color:var(--short)} .legend-list .warn .ic{color:var(--warn)}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px}
+.toolbar .summary{flex:1 1 360px}
+.toolbar .add{padding:0;flex:0 1 300px}
+.below{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:1100px){.below{grid-template-columns:1fr}}
+.jrow .lv{grid-column:2 / 3;display:flex;flex-wrap:wrap;gap:2px 12px;font-size:12px;color:var(--muted)}
+.jrow .lv b{font-weight:600;color:var(--text-2)}
+.jrow .act{display:flex;gap:4px;justify-content:flex-end}
+.jrow .act .btn{height:26px;padding:0 8px;font-size:12px}
+.jrow.closed .who,.jrow.closed .lv{opacity:.75}
+.sub-h{margin:0;padding:12px 16px 4px;font-size:12px;font-weight:650;color:var(--muted)}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:28px 24px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6}
+.empty .ic{width:28px;height:28px;stroke-width:1.5;color:var(--line-strong);margin-bottom:2px}
+.empty strong{color:var(--text-2);font-size:13px;font-weight:650}
+.pp{padding:14px 16px 16px}
+.pp .rulebox{margin:0 0 12px;font-size:13px;line-height:1.6;color:var(--text-2)}
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;background:var(--line)}
+.pgrid div{background:var(--surface-2);padding:9px 10px}
+.pgrid span{display:block;font-size:11px;color:var(--muted);margin-bottom:2px}
+.pgrid b{font-size:14px;font-weight:700}
+.pgrid + .pgrid{margin-top:8px}
+.cap{margin:10px 0 0;font-size:12px;line-height:1.6;color:var(--muted)}
+.cap b{color:var(--text-2);font-weight:600}
+.add{display:flex;gap:8px;padding:14px 16px 6px}
+.field{flex:1;min-width:0;height:36px;padding:0 12px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--bg);text-transform:uppercase;transition:border-color .15s}
+.field::placeholder{color:var(--muted);text-transform:none}
+.field:hover{border-color:var(--line-strong)}
+.field:focus{outline:none;border-color:var(--accent)}
+.add .btn{height:36px}
+.note{display:flex;gap:10px;padding:14px 16px;font-size:12.5px;line-height:1.65;color:var(--muted)}
+.note .ic{color:var(--accent);margin-top:2px}
+.note ol{margin:0;padding-left:18px}
+.note li + li{margin-top:4px}
+.note strong{color:var(--text-2);font-weight:600}
+
+/* ---------- modal ---------- */
+.ov{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(4,6,10,.72);backdrop-filter:blur(3px)}
+.ov.show{display:flex;animation:fade .2s ease-out}
+@keyframes fade{from{opacity:0}}
+.modal{width:min(480px,100%);max-height:calc(100dvh - 32px);overflow:auto;background:var(--surface);border:1px solid var(--line-strong);border-radius:16px;box-shadow:var(--shadow);animation:rise .28s var(--ease)}
+@keyframes rise{from{opacity:0;transform:translateY(12px) scale(.98)}}
+.m-h{padding:20px 22px 16px;border-bottom:1px solid var(--line)}
+.modal.stop .m-h{background:linear-gradient(180deg,var(--short-tint),transparent)}
+.modal.target .m-h{background:linear-gradient(180deg,var(--long-tint),transparent)}
+.m-h h2{margin:0;display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:20px;letter-spacing:-.02em}
+.m-sub{margin-top:6px;font-size:13px;line-height:1.55;color:var(--text-2)}
+.m-b{display:flex;flex-direction:column;gap:12px;padding:16px 22px 4px}
+.m-b blockquote{margin:0;padding:10px 12px;border-left:2px solid var(--line-strong);background:var(--surface-2);border-radius:0 var(--r-sm) var(--r-sm) 0;font-size:13px;line-height:1.6;color:var(--text-2)}
+.m-f{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:16px 22px 20px}
+.side-badge{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 9px;border-radius:var(--r-sm);font-size:12px;font-weight:700}
+.side-badge.long{background:var(--long);color:#03140c}
+.side-badge.short{background:var(--short);color:#fff}
+.side-badge .ic{width:14px;height:14px;stroke-width:2.6}
+
+.toast{position:fixed;left:50%;bottom:24px;z-index:200;display:flex;align-items:center;gap:8px;max-width:calc(100vw - 32px);padding:10px 14px;border:1px solid var(--line-strong);border-radius:var(--r-md);background:var(--surface-3);box-shadow:var(--shadow);font-size:13px;transform:translate(-50%,8px);opacity:0;pointer-events:none;transition:opacity .2s,transform .25s var(--ease)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.toast .ic{color:var(--accent)}
+
+/* ---------- responsive ---------- */
+@media (max-width:1180px){main{grid-template-columns:1fr}}
+@media (max-width:720px){
+  header{padding:10px 16px 0;gap:10px}
+  .brand p{display:none}
+  .status{margin-left:auto}
+  .controls{margin-left:0;flex-wrap:nowrap}
+  .cards{grid-template-columns:1fr 1fr;gap:10px}
+  .card{padding:12px;gap:10px}
+  .c-top{padding-right:20px}
+  .c-price{flex-direction:column;align-items:flex-start;gap:2px}
+  .px{font-size:18px}
+  .stats{grid-template-columns:1fr 1fr;gap:8px}
+  .rm{top:4px;right:4px}
+  .btn .lbl{display:none}
+  .cond,.wsub{display:none}
+  .btn{padding:0 10px}
+  main{padding:16px;gap:16px}
+  .col{gap:16px}
+  #chart{height:320px}
+  .legend{display:none}
+  .jstats{grid-template-columns:repeat(2,1fr)}
+  .m-h,.m-b,.m-f{padding-left:16px;padding-right:16px}
+}
+@media (max-width:380px){.status .cdp{display:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-candle" viewBox="0 0 24 24"><path d="M7 3v3M7 15v6M17 3v5M17 17v4"/><rect x="4.5" y="6" width="5" height="9" rx="1"/><rect x="14.5" y="8" width="5" height="9" rx="1"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+  <symbol id="i-bell-off" viewBox="0 0 24 24"><path d="M8.7 3A6 6 0 0 1 18 8a21 21 0 0 0 .6 5"/><path d="M17 17H3s3-2 3-9a4.7 4.7 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="m2 2 20 20"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m22 17-8.5-8.5-5 5L2 7"/><path d="M16 17h6v-6"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3"/><path d="M12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-radar" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></symbol>
+  <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6L4.5 19a2 2 0 0 0 1.8 3h11.4a2 2 0 0 0 1.8-3L14 9V3"/><path d="M7 15h10"/></symbol>
+  <symbol id="i-tri-up" viewBox="0 0 10 10"><path d="M5 1.5 9.5 8.5h-9z"/></symbol>
+  <symbol id="i-tri-down" viewBox="0 0 10 10"><path d="M5 8.5 .5 1.5h9z"/></symbol>
+</svg>
+
+<header>
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true"><svg class="ic"><use href="#i-candle"/></svg></div>
+    <div><h1>코인 매매 계획판</h1><p>Bybit USDT 무기한 · 쉬는 구간 먼저, 틀렸을 때 먼저</p></div>
+  </div>
+  <div class="status">
+    <button type="button" class="pill watch" id="watch" title="감시 상태 자세히 보기"><span class="dot" id="wsDot"></span><span id="wsTxt" aria-live="polite">연결 중</span><span class="wsub num" id="wsSub"></span></button>
+    <span class="pill cdp"><span id="cdLabel">봉</span> 마감 <b class="num" id="countdown">--:--</b></span>
+  </div>
+  <div class="controls">
+    <span class="cond">페이지가 열려 있고 시세가<br>들어오는 동안만 감시해요</span>
+    <button class="btn" id="notiBtn" aria-pressed="false"><svg class="ic"><use href="#i-bell"/></svg><span class="lbl">브라우저 알림</span></button>
+    <button class="btn" id="notiTest" title="윈도우 알림이 실제로 뜨는지 확인"><svg class="ic"><use href="#i-check"/></svg><span class="lbl">테스트 알림</span></button>
+  </div>
+  <nav class="tabs" id="tabs" role="tablist" aria-label="봉 단위"></nav>
+</header>
+
+<main id="view" role="tabpanel">
+  <div class="col">
+    <div class="toolbar">
+      <p class="summary" id="summary"></p>
+      <form class="add" id="addForm">
+        <input class="field" id="addIn" placeholder="코인 추가: ADA, PEPE…" autocomplete="off" spellcheck="false" aria-label="추가할 Bybit USDT 무기한 심볼" title="Bybit USDT 무기한 선물 심볼. USDT는 생략해도 됩니다.">
+        <button class="btn primary" id="addBtn"><svg class="ic"><use href="#i-plus"/></svg><span>추가</span></button>
+      </form>
+    </div>
+    <section class="cards" id="cards" aria-label="추적 중인 코인"></section>
+    <section class="panel">
+      <div class="panel-h">
+        <h2 class="chart-title" id="chartTitle">차트</h2>
+        <div class="legend" aria-hidden="true"><span><i style="background:var(--ema20)"></i>EMA20</span><span><i style="background:var(--ema50)"></i>EMA50</span><span><i style="background:var(--ema200)"></i>EMA200</span><span>점선 = 계획·보유 중인 가격</span></div>
+      </div>
+      <div id="chart"></div>
+    </section>
+    <div class="below">
+    <section class="panel" aria-labelledby="jTitle">
+      <div class="panel-h"><h2 id="jTitle">매매 일지 <span class="count num" id="jCount">0</span></h2><button type="button" class="q" data-help="journal" aria-label="매매 일지 숫자 설명">?</button></div>
+      <div id="jBody"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="ppTitle">
+      <div class="panel-h"><h2 id="ppTitle">실험 규칙 · 모의 기록</h2><span class="ph-r"><span class="chip rest">알림 없음</span><button type="button" class="q" data-help="paper" aria-label="실험 규칙 설명">?</button></span></div>
+      <div class="pp" id="pp"><span class="sk" style="width:100%;height:80px"></span></div>
+    </section>
+    </div>
+  </div>
+
+  <aside class="col">
+    <section class="panel" aria-labelledby="plTitle">
+      <div class="panel-h"><h2 id="plTitle">매매 계획</h2><span class="ph-r"><button type="button" class="chip rest term-chip" id="plState" data-help="regime" title="추세 구간·쉬는 구간 기준 보기">-</button></span></div>
+      <div class="pl">
+        <div>
+          <div class="pl-top">
+            <div class="pl-sym" id="plSym">-</div>
+            <div class="seg" role="group" aria-label="방향"><button class="long" id="plLong" aria-pressed="true">롱</button><button class="short" id="plShort" aria-pressed="false">숏</button></div>
+          </div>
+          <p class="cap" id="plReason" style="margin-top:6px"></p>
+        </div>
+        <div class="fgrid">
+          <div class="f"><div class="lab"><label for="plEntry">진입가</label><button type="button" class="q" data-help="entry" aria-label="진입가 설명">?</button></div><div class="inp"><input id="plEntry" inputmode="decimal" autocomplete="off"></div>
+            <div class="quick"><button type="button" data-q="now">현재가 따라가기</button></div></div>
+          <div class="f"><div class="lab"><label for="plStop">손절가 · 틀렸다고 볼 가격</label><button type="button" class="q" data-help="stop" aria-label="손절가 설명">?</button></div><div class="inp"><input id="plStop" inputmode="decimal" autocomplete="off"></div>
+            <div class="quick"><button type="button" data-q="swing">최근 저점</button><button type="button" data-q="atr">2×ATR</button></div></div>
+          <div class="f"><div class="lab"><label for="plTp">목표 · 손익비</label><button type="button" class="q" data-help="tp" aria-label="목표 설명">?</button></div><div class="inp"><input id="plTp" inputmode="decimal" autocomplete="off"><span>배</span></div></div>
+          <div class="f"><div class="lab"><label for="plLev">레버리지</label><button type="button" class="q" data-help="lev" aria-label="레버리지 설명">?</button></div><div class="inp"><input id="plLev" inputmode="numeric" autocomplete="off"><span>배</span></div></div>
+        </div>
+        <div class="kv num" id="plOut"></div>
+        <div class="wrong" id="plWrong"></div>
+        <div class="lab" style="margin-bottom:-6px"><span class="lab-h">원칙 확인</span><button type="button" class="q" data-help="checks" aria-label="원칙 확인 설명">?</button></div>
+        <ul class="checks" id="plChecks" aria-label="원칙 확인"></ul>
+        <textarea class="ta" id="plNote" placeholder="왜 들어가는지, 어떤 모습이면 틀렸다고 인정할지 적어 두세요. 손절 알림 때 다시 보여 드립니다."></textarea>
+        <button class="btn primary block" id="plSave">일지에 진입 기록</button>
+        <details class="acct" id="acct">
+          <summary><span>계좌 설정 · <b id="acctSum"></b></span><span class="mt">변경</span></summary>
+          <div class="fgrid">
+            <div class="f"><label for="acBal">계좌 금액</label><div class="inp"><input id="acBal" inputmode="decimal"><span>USDT</span></div></div>
+            <div class="f"><div class="lab"><label for="acRisk">1회 위험</label><button type="button" class="q" data-help="risk" aria-label="1회 위험 설명">?</button></div><div class="inp"><input id="acRisk" inputmode="decimal"><span>%</span></div></div>
+            <div class="f"><div class="lab"><label for="acDay">하루 손실 한도 · 위험금의</label><button type="button" class="q" data-help="day" aria-label="하루 손실 한도 설명">?</button></div><div class="inp"><input id="acDay" inputmode="decimal"><span>배</span></div></div>
+            <div class="f"><div class="lab"><label for="acMax">동시 보유 한도</label><button type="button" class="q" data-help="max" aria-label="동시 보유 한도 설명">?</button></div><div class="inp"><input id="acMax" inputmode="numeric"><span>개</span></div></div>
+          </div>
+          <div class="set-row" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:13px"><span>손절·목표 도달 알림음</span><button class="switch" id="acSound" role="switch" aria-checked="true" aria-label="손절·목표 도달 알림음"></button></div>
+        </details>
+      </div>
+    </section>
+
+    <section class="panel note">
+      <svg class="ic"><use href="#i-info"/></svg>
+      <ol>
+        <li><strong>돈이 기준</strong> — 지표 점수 신호는 1년 가까운 백테스트에서 수수료를 빼면 모두 손실이라 알림을 없앴습니다. 실력은 일지의 실제 손익으로 잽니다.</li>
+        <li><strong>쉬는 구간</strong> — 방향 없는 코인은 흐리게 보입니다. 추세 구간이라고 이긴다는 뜻은 아니며, 원칙상 매매를 고려해도 되는 구간일 뿐입니다.</li>
+        <li><strong>틀렸을 때 먼저</strong> — 손실액과 연속 손실 시나리오를 보고 기록하고, 손절가에 닿으면 알려 드립니다.</li>
+        <li>투자 조언이 아닙니다. 선물은 원금 이상 잃을 수 있습니다.</li>
+      </ol>
+    </section>
+  </aside>
+</main>
+
+<div class="ov" id="ov"><div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle"></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+/* ================= 설정 ================= */
+const REST = 'https://api.bybit.com';
+const WS_URL = 'wss://stream.bybit.com/v5/public/linear';
+const DEFAULT_SYMS = ['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','DOGEUSDT','BNBUSDT'];
+const FEE = 0.0011;     // 왕복 수수료+슬리피지 가정 (진입가 대비)
+const SLIP_R = 0.2;     // 손절 체결 시 손절 폭 대비 추가 미끄러짐 가정
+const MMR = 0.005;      // 유지증거금률 근사 (예상 청산가 계산용)
+const IVS = ['1','15','60','240','D'];
+const IV_MS = {'1':60e3, '15':900e3, '60':3600e3, '240':14400e3, 'D':86400e3};
+const BAR_NAME = {'1':'1분봉', '15':'15분봉', '60':'1시간봉', '240':'4시간봉', 'D':'일봉'};
+const FETCH = {'1':400, '15':400, '60':1000, '240':400, 'D':300};
+const TFS = [
+  {key:'1',   label:'1분',   short:'1m',  higher:'15'},
+  {key:'15',  label:'15분',  short:'15m', higher:'60'},
+  {key:'60',  label:'1시간', short:'1h',  higher:'240'},
+  {key:'240', label:'4시간', short:'4h',  higher:'D'},
+];
+const TF = Object.fromEntries(TFS.map(t => [t.key, t]));
+const OI_IV = {'1':'5min', '15':'15min', '60':'1h', '240':'4h'};
+const OI_FETCH = {'1':200, '15':200, '60':1000, '240':200};
+// 추세 구간 / 쉬는 구간: "방향 없는 구간에서는 쉰다"는 원칙을 숫자로 옮긴 기준.
+// 수익을 보장하는 기준이 아니다 — 백테스트에서 추세 구간만 골라도 지표 신호는 손실이었다.
+const REGIME = {er:0.3, slope:0.2, vol:1.6};
+// 실험 규칙 (알림 없이 모의 기록만). 2026-10 연구: 1시간봉 250일·10개 코인, 거래당 +0.14R(수수료·미끄러짐 포함)
+// 이었지만 동시 보유를 2개로 제한하면 -0.11R. 실전 검증 전까지 돈을 걸 규칙이 아니다.
+const PAPER = {tf:'60', sl:2, tp:3, hold:48, cooldown:4};
+const LIQ_WINDOW = 3600e3;
+// 감시 상태: 마지막 시세가 LAG_MS 넘게 없으면 '지연', STALE_MS 넘으면 '감시 중단'(재연결 시도).
+// 보유 종목은 거래가 뜸한 코인도 있어 조금 더 여유를 둔다. GAP_MS 넘게 끊겼다 돌아오면 그 사이를 다시 확인한다.
+const LAG_MS = 10e3, HELD_LAG_MS = 20e3, STALE_MS = 30e3, GAP_MS = 30e3;
+
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+const S = {
+  symbols: store.get('cs_syms', DEFAULT_SYMS),
+  tab: TF[store.get('cs_tab', '15')] ? store.get('cs_tab', '15') : '15',
+  acct: {bal:1000, risk:1, day:3, max:2, sound:true, ...store.get('cs_acct', {})},
+  plan: {dir:'long', entry:null, entryAuto:true, stop:null, stopAuto:'swing', tp:2, lev:5, note:''},
+  journal: store.get('cs_journal', []),
+  paper: store.get('cs_paper', []),
+  sel: null, d: {}, ws: null, wsOpen: false, lastMsg: 0, gaps: [], queue: [], modalOpen: false,
+};
+S.sel = S.symbols[0];
+const saveJournal = () => store.set('cs_journal', S.journal);
+const savePaper = () => store.set('cs_paper', S.paper);
+
+/* ================= 지표 ================= */
+function ema(v, p){
+  const out = new Array(v.length).fill(NaN);
+  if (v.length < p) return out;
+  const k = 2/(p+1); let sum = 0;
+  for (let i = 0; i < p; i++) sum += v[i];
+  let prev = sum/p; out[p-1] = prev;
+  for (let i = p; i < v.length; i++){ prev = v[i]*k + prev*(1-k); out[i] = prev; }
+  return out;
+}
+function atr(k, p=14){
+  const out = new Array(k.length).fill(NaN);
+  if (k.length <= p) return out;
+  const tr = k.map((b,i) => i === 0 ? b.h-b.l : Math.max(b.h-b.l, Math.abs(b.h-k[i-1].c), Math.abs(b.l-k[i-1].c)));
+  let a = 0; for (let i = 1; i <= p; i++) a += tr[i]; a /= p; out[p] = a;
+  for (let i = p+1; i < k.length; i++){ a = (a*(p-1) + tr[i])/p; out[i] = a; }
+  return out;
+}
+function series(k){ const c = k.map(b=>b.c); return {c, e20:ema(c,20), e50:ema(c,50), e200:ema(c,200), atr:atr(k)}; }
+function higherIndex(H, ms, closeT){
+  let lo = 0, hi = H.length-1, ans = -1;
+  while (lo <= hi){ const m = (lo+hi) >> 1; if (H[m].t + ms <= closeT){ ans = m; lo = m+1; } else hi = m-1; }
+  return ans;
+}
+// 상위 봉(iv)의 마감 기준 추세: 1 상승 / -1 하락 / 0 횡보
+function trendAt(D, tf, i, iv){
+  const H = D.k[iv], hs = D.ser[iv]; if (!H || !hs) return 0;
+  const hi = higherIndex(H, IV_MS[iv], D.k[tf][i].t + IV_MS[tf]); if (hi < 55) return 0;
+  const c = hs.c[hi], e20 = hs.e20[hi], e50 = hs.e50[hi];
+  return c > e50 && e20 > e50 ? 1 : c < e50 && e20 < e50 ? -1 : 0;
+}
+
+/* ================= 시장 상태 (추세 구간 / 쉬는 구간) ================= */
+function regimeAt(D, tf, i){
+  const k = D.k[tf], s = D.ser[tf]; if (!s || i < 120 || i >= k.length) return null;
+  let path = 0; for (let j = i-19; j <= i; j++) path += Math.abs(k[j].c - k[j-1].c);
+  const er = path > 0 ? Math.abs(k[i].c - k[i-20].c)/path : 0;
+  const slope = (s.e50[i] - s.e50[i-10]) / s.atr[i];
+  let am = 0; for (let j = i-100; j < i; j++) am += s.atr[j]; am /= 100;
+  const vol = s.atr[i]/am, hT = trendAt(D, tf, i, TF[tf].higher), c = k[i].c;
+  let state = 'rest';
+  if (er >= REGIME.er && slope >= REGIME.slope && hT >= 0 && c > s.e50[i]) state = 'up';
+  else if (er >= REGIME.er && slope <= -REGIME.slope && hT <= 0 && c < s.e50[i]) state = 'down';
+  return {state, er, slope, vol, hT};
+}
+// 마감된 마지막 봉 기준 (진행 중인 봉으로 상태가 깜빡이지 않게)
+const liveRegime = (D, tf) => regimeAt(D, tf, D.k[tf].length-2);
+const STATE_NAME = {up:'상승 추세', down:'하락 추세', rest:'쉬는 구간'};
+function regimeReason(r, tf){
+  if (!r) return '데이터를 계산하는 중입니다.';
+  const HB = BAR_NAME[TF[tf].higher], ht = r.hT > 0 ? '상승' : r.hT < 0 ? '하락' : '횡보';
+  if (r.state !== 'rest') return `20봉 추세 효율 ${r.er.toFixed(2)}, EMA50이 10봉 동안 ATR의 ${Math.abs(r.slope).toFixed(2)}배 ${r.state === 'up' ? '상승' : '하락'}, ${HB} ${ht}.`;
+  const why = [];
+  if (r.er < REGIME.er) why.push(`20봉 동안 오르내림에 비해 실제 이동이 적어요 (추세 효율 ${r.er.toFixed(2)}, 기준 ${REGIME.er})`);
+  if (Math.abs(r.slope) < REGIME.slope) why.push(`EMA50이 거의 평평해요 (기울기 ${signed(r.slope, 2)})`);
+  if (r.er >= REGIME.er && Math.abs(r.slope) >= REGIME.slope) why.push(`${HB}(${ht})나 EMA50 위치가 방향과 맞지 않아요`);
+  return why.join(' · ') + '.';
+}
+
+/* ================= 미결제약정(OI) · 청산 ================= */
+function oiFeat(D, tf){
+  const k = D.k[tf], O = D.oi[tf] || [], ms = IV_MS[tf], n = k.length, L = tf === '1' ? 5 : 1;
+  const key = n + ':' + O.length + ':' + (O.length ? O[O.length-1].t : 0);
+  if (D.oiF[tf]?.key === key) return D.oiF[tf];
+  const oiC = new Array(n).fill(NaN); let p = 0;
+  for (let i = 0; i < n; i++){
+    const C = k[i].t + ms; while (p+1 < O.length && O[p+1].t <= C) p++;
+    if (O[p] && O[p].t <= C && C - O[p].t <= Math.max(ms, 300e3)) oiC[i] = O[p].v;
+  }
+  const oi1 = oiC.map((v,i) => i >= L ? v/oiC[i-L] - 1 : NaN);
+  const z = new Array(n).fill(NaN);
+  for (let i = 100; i < n; i++){
+    let m = 0, q = 0, c = 0;
+    for (let j = i-96; j < i; j++) if (isFinite(oi1[j])){ m += oi1[j]; q += oi1[j]**2; c++; }
+    if (c > 50){ m /= c; z[i] = (oi1[i]-m) / Math.sqrt(Math.max(q/c - m*m, 1e-12)); }
+  }
+  return (D.oiF[tf] = {key, oiC, oi1, z, L});
+}
+function liveOIChange(D, tf){
+  const F = oiFeat(D, tf), n = D.k[tf].length, v = +D.tk.openInterest, base = F.oiC[n-1-4*F.L];
+  return v > 0 && base > 0 ? v/base - 1 : NaN;
+}
+function recordOI(D, tf){ // 봉 마감 시각의 OI를 티커 값으로 기록 (REST 이력과 같은 '그 시각 스냅숏')
+  const O = D.oi[tf], v = +D.tk.openInterest, k = D.k[tf], C = k[k.length-1].t + IV_MS[tf];
+  if (!O || !(v > 0) || (O.length && O[O.length-1].t >= C)) return;
+  O.push({t:C, v}); if (O.length > OI_FETCH[tf]*2) O.splice(0, OI_FETCH[tf]);
+}
+function liqSum(D){
+  const now = Date.now(); D.liq = D.liq.filter(x => now - x.T <= LIQ_WINDOW);
+  let long = 0, short = 0; for (const x of D.liq){ if (x.side === 'long') long += x.usd; else short += x.usd; }
+  return {long, short};
+}
+
+/* ================= 실험 규칙 (모의 기록) ================= */
+function paperEventAt(D, i){
+  const tf = PAPER.tf, k = D.k[tf], s = D.ser[tf]; if (!D.oi[tf]?.length || i < 210) return null;
+  const F = oiFeat(D, tf), a = s.atr[i-1]; if (!(a > 0) || !isFinite(F.z[i])) return null;
+  const r1 = (k[i].c - k[i-1].c)/a;
+  if (!(r1 < -1 && F.z[i] < -2) || trendAt(D, tf, i, 'D') === 1) return null;
+  return {r1, z:F.z[i], oi1:F.oi1[i]};
+}
+// 손절 먼저 체크(보수적), 손절은 SLIP_R 만큼 더 불리하게 체결된다고 가정
+function simPaper(k, i, atrv){
+  const e0 = k[i].c, risk = PAPER.sl*atrv, sl = e0 - risk, tp = e0 + PAPER.tp*risk, last = k.length-2, fee = FEE*e0/risk;
+  for (let j = i+1; j <= Math.min(last, i+PAPER.hold); j++){
+    if (k[j].l <= sl) return {R: -1 - SLIP_R - fee, exitT: k[j].t, how:'손절'};
+    if (k[j].h >= tp) return {R: PAPER.tp - fee, exitT: k[j].t, how:'목표'};
+  }
+  if (i + PAPER.hold > last) return null;
+  return {R: (k[i+PAPER.hold].c - e0)/risk - fee, exitT: k[i+PAPER.hold].t, how:'시간'};
+}
+function paperBacktest(){
+  let n = 0, R = 0, w = 0, t0 = Infinity, t1 = 0;
+  for (const sym of S.symbols){
+    const D = S.d[sym]; if (!D) continue;
+    const k = D.k[PAPER.tf]; let last = -Infinity;
+    t0 = Math.min(t0, k[210]?.t ?? Infinity); t1 = Math.max(t1, k[k.length-1].t);
+    for (let i = 210; i < k.length-1; i++){
+      if (i - last < PAPER.cooldown || !paperEventAt(D, i)) continue; last = i;
+      const r = simPaper(k, i, D.ser[PAPER.tf].atr[i]); if (!r) continue;
+      n++; R += r.R; if (r.R > 0) w++;
+    }
+  }
+  return {n, avg: n ? R/n : 0, sum: R, win: n ? w/n*100 : 0, days: (t1 - t0)/86400e3};
+}
+function paperLive(sym){
+  const D = S.d[sym], k = D.k[PAPER.tf], i = k.length-1;
+  if (paperEventAt(D, i) && !S.paper.some(p => p.sym === sym && k[i].t - p.t < PAPER.cooldown*IV_MS[PAPER.tf])){
+    S.paper.unshift({id:Date.now()+Math.random(), sym, t:k[i].t, entry:k[i].c, atr:D.ser[PAPER.tf].atr[i], status:'open'});
+  }
+  resolvePaper(sym); savePaper(); renderPaper();
+}
+function resolvePaper(sym){
+  const D = S.d[sym]; if (!D) return;
+  const k = D.k[PAPER.tf];
+  for (const p of S.paper){
+    if (p.sym !== sym || p.status !== 'open') continue;
+    const i = k.findIndex(b => b.t === p.t); if (i < 0) continue;
+    const r = simPaper(k, i, p.atr); if (r){ p.status = 'closed'; Object.assign(p, r); }
+  }
+}
+
+/* ================= 데이터 ================= */
+const parseK = r => ({t:+r[0], o:+r[1], h:+r[2], l:+r[3], c:+r[4], v:+r[5]});
+async function getJSON(path){
+  const res = await fetch(REST + path);
+  const j = await res.json();
+  if (j.retCode !== 0) throw new Error(j.retMsg || 'API 오류');
+  return j.result;
+}
+async function fetchKlines(sym, iv, total){
+  let out = [], end = null;
+  while (out.length < total){
+    const lim = Math.min(1000, total - out.length);
+    const r = await getJSON(`/v5/market/kline?category=linear&symbol=${sym}&interval=${iv}&limit=${lim}` + (end ? `&end=${end}` : ''));
+    const bars = r.list.map(parseK);
+    if (!bars.length) break;
+    out = out.concat(bars); end = bars[bars.length-1].t - 1;
+    if (bars.length < lim) break;
+  }
+  return out.reverse();
+}
+async function fetchOI(sym, tf, total){
+  let out = [], end = null;
+  try{
+    while (out.length < total){
+      const r = await getJSON(`/v5/market/open-interest?category=linear&symbol=${sym}&intervalTime=${OI_IV[tf]}&limit=200` + (end ? `&endTime=${end}` : ''));
+      const l = r.list.map(x => ({t:+x.timestamp, v:+x.openInterest}));
+      if (!l.length) break;
+      out = out.concat(l); end = l[l.length-1].t - 1;
+      if (l.length < 200) break;
+    }
+  }catch(e){ console.warn('OI 불러오기 실패', sym, tf, e); }
+  return out.reverse();
+}
+async function loadSymbol(sym){
+  const [tk, ...ks] = await Promise.all([
+    getJSON(`/v5/market/tickers?category=linear&symbol=${sym}`),
+    ...IVS.map(iv => fetchKlines(sym, iv, FETCH[iv])),
+    ...TFS.map(t => fetchOI(sym, t.key, OI_FETCH[t.key])),
+  ]);
+  if (!tk.list.length || !ks[1].length) throw new Error('심볼을 찾을 수 없음');
+  const D = {k:{}, ser:{}, oi:{}, oiF:{}, liq:[], dirty:new Set(), tk:tk.list[0]};
+  IVS.forEach((iv,n) => { D.k[iv] = ks[n]; D.ser[iv] = series(ks[n]); });
+  TFS.forEach((t,n) => { D.oi[t.key] = ks[IVS.length + n]; });
+  S.d[sym] = D;
+  resolvePaper(sym);
+}
+function refreshSeries(D){ for (const iv of D.dirty) D.ser[iv] = series(D.k[iv]); D.dirty.clear(); }
+function upsert(D, iv, bar){
+  const arr = D.k[iv], last = arr[arr.length-1];
+  if (last && last.t === bar.t) arr[arr.length-1] = bar;
+  else if (!last || bar.t > last.t){ arr.push(bar); if (arr.length > FETCH[iv]*2){ arr.splice(0, FETCH[iv]); D.oiF = {}; } }
+  D.dirty.add(iv);
+}
+
+function connectWS(){
+  const ws = new WebSocket(WS_URL); S.ws = ws;
+  let ping;
+  ws.onopen = () => { setStatus(true); subscribe(S.symbols); ping = setInterval(() => ws.readyState === 1 && ws.send(JSON.stringify({op:'ping'})), 20000); };
+  ws.onclose = () => { clearInterval(ping); setStatus(false); if (S.ws === ws) setTimeout(connectWS, 3000); };
+  ws.onerror = () => ws.close();
+  ws.onmessage = ev => {
+    const m = JSON.parse(ev.data); if (!m.topic) return;
+    const [kind, a, b2] = m.topic.split('.'), now = Date.now();
+    // 시세가 한동안 끊겼다 다시 들어오면, 그 사이 손절·목표가를 지났는지 따로 확인한다
+    if (kind !== 'allLiquidation'){ if (S.lastMsg && now - S.lastMsg > GAP_MS) handleGap(S.lastMsg, now); S.lastMsg = now; }
+    if (kind === 'kline'){
+      const sym = b2, D = S.d[sym]; if (!D || !D.k[a]) return;
+      D.lastTick = now;
+      for (const x of m.data){
+        const bar = {t:+x.start, o:+x.open, h:+x.high, l:+x.low, c:+x.close, v:+x.volume};
+        upsert(D, a, bar);
+        if (a === '1') checkTrades(sym, bar); // 1분봉 고가·저가로 틱 사이 스파이크도 잡는다
+        if (x.confirm && TF[a]){ refreshSeries(D); recordOI(D, a); if (a === PAPER.tf) paperLive(sym); }
+      }
+      scheduleRefresh(sym);
+    } else if (kind === 'tickers'){
+      const D = S.d[a]; if (!D) return;
+      D.lastTick = now;
+      for (const [key,val] of Object.entries(m.data)) if (val !== undefined && val !== '') D.tk[key] = val;
+      checkTrades(a); // 타이머를 거치지 않고 바로 확인 (백그라운드 탭에서는 타이머가 최대 1분까지 늦춰진다)
+      scheduleRefresh(a);
+    } else if (kind === 'allLiquidation'){
+      // S = 청산된 포지션 방향: Buy → 롱 청산, Sell → 숏 청산
+      const D = S.d[a]; if (!D) return;
+      for (const x of [].concat(m.data)) D.liq.push({T:+x.T, side: x.S === 'Buy' ? 'long' : 'short', usd: +x.v * +x.p});
+      scheduleRefresh(a);
+    }
+  };
+}
+function subscribe(syms, op='subscribe'){
+  if (!S.ws || S.ws.readyState !== 1) return;
+  const args = syms.flatMap(s => [...IVS.map(iv => `kline.${iv}.${s}`), `tickers.${s}`, `allLiquidation.${s}`]);
+  for (let i = 0; i < args.length; i += 10) S.ws.send(JSON.stringify({op, args: args.slice(i,i+10)}));
+}
+
+/* ================= 공통 ================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const icon = (id, cls='') => `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${id}"/></svg>`;
+const signed = (x, d) => { const v = Math.abs(x) < 0.5/10**d ? 0 : x; return (v > 0 ? '+' : '') + v.toFixed(d); };
+const num = v => { const x = parseFloat(String(v).replace(/,/g, '')); return isFinite(x) ? x : NaN; };
+function fmt(x){
+  if (!isFinite(x)) return '-';
+  const a = Math.abs(x), d = a >= 1000 ? 1 : a >= 100 ? 2 : a >= 1 ? 4 : a >= 0.01 ? 5 : 8;
+  return x.toLocaleString('en-US', {minimumFractionDigits:d, maximumFractionDigits:d});
+}
+const raw = x => { if (!isFinite(x)) return ''; const a = Math.abs(x), d = a >= 1000 ? 1 : a >= 100 ? 2 : a >= 1 ? 4 : a >= 0.01 ? 5 : 8; return x.toFixed(d); };
+const usd = x => !isFinite(x) ? '-' : Math.abs(x) >= 1e6 ? '$' + (x/1e6).toFixed(2) + 'M' : Math.abs(x) >= 1e4 ? '$' + (x/1e3).toFixed(1) + 'K' : '$' + x.toLocaleString('en-US', {maximumFractionDigits: Math.abs(x) >= 100 ? 0 : 2});
+const money = x => !isFinite(x) ? '-' : (x >= 0 ? '+' : '−') + usd(Math.abs(x));
+const riskUsd = () => S.acct.bal*S.acct.risk/100;
+// R = 손절에 걸렸을 때 잃는 금액(1회 위험금)을 1로 본 단위. 화면에는 "위험금의 n배"로 풀어 쓴다.
+const rSmall = r => isFinite(r) ? `<small>위험금의 ${signed(r, 2)}배</small>` : '';
+const qtyFmt = q => q >= 100 ? q.toFixed(0) : q >= 1 ? q.toFixed(3) : q.toPrecision(3);
+const fmtTime = t => new Date(t).toLocaleString('ko-KR', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit', hour12:false});
+const priceOf = sym => { const D = S.d[sym]; return D ? (+D.tk.lastPrice || D.k['1'].at(-1).c) : NaN; };
+function toast(msg, ic='info'){
+  const t = $('#toast'); t.innerHTML = icon(ic) + `<span>${esc(msg)}</span>`; t.classList.add('show');
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 3200);
+}
+function setStatus(on){ S.wsOpen = on; renderWatch(); }
+const agoTxt = ms => !isFinite(ms) ? '받은 적 없음' : ms < 1500 ? '방금' : ms < 60e3 ? `${Math.round(ms/1000)}초 전` : `${Math.round(ms/60e3)}분 전`;
+function watchState(){
+  const now = Date.now(), held = [...new Set(S.journal.filter(j => j.status === 'open').map(j => j.sym))];
+  const rows = S.symbols.map(s => ({s, age: S.d[s]?.lastTick ? now - S.d[s].lastTick : Infinity, held: held.includes(s)}));
+  held.filter(s => !S.symbols.includes(s)).forEach(s => rows.push({s, age: Infinity, held: true, untracked: true}));
+  const last = S.lastMsg ? now - S.lastMsg : Infinity, heldRows = rows.filter(r => r.held);
+  let state = 'ok';
+  if (!S.wsOpen || last > STALE_MS || heldRows.some(r => r.untracked)) state = 'stop';
+  else if (last > LAG_MS || heldRows.some(r => r.age > HELD_LAG_MS)) state = 'lag';
+  return {state, last, held, rows};
+}
+function renderWatch(){
+  const w = watchState(), b = $('#watch'), n = w.held.length;
+  $('#wsDot').className = 'dot ' + (w.state === 'ok' ? 'on' : w.state === 'lag' ? 'lag' : 'off');
+  $('#wsTxt').textContent = w.state === 'ok' ? '감시 정상' : w.state === 'lag' ? '지연' : '감시 중단';
+  const slow = w.rows.filter(r => r.held).sort((a,b) => b.age - a.age)[0];
+  $('#wsSub').textContent = w.state === 'stop' ? (n ? `보유 ${n}개 감시 못 함` : S.wsOpen ? '시세 없음' : '재연결 중')
+    : w.state === 'lag' && slow && slow.age > HELD_LAG_MS ? `${slow.s.replace(/USDT$/,'')} 시세 ${agoTxt(slow.age)}`
+    : `시세 ${agoTxt(w.last)} · 보유 ${n}개`;
+  b.classList.toggle('alarm', w.state === 'stop' && n > 0);
+  b.classList.toggle('warn', w.state === 'lag');
+  // 연결은 살아 있는데 시세가 오래 안 오면 다시 연결한다
+  if (S.wsOpen && S.lastMsg && w.last > STALE_MS && S.ws && Date.now() - (S.forcedAt || 0) > STALE_MS){ S.forcedAt = Date.now(); S.ws.close(); }
+}
+
+/* ================= 탭 · 카드 ================= */
+function renderTabs(){
+  $('#tabs').innerHTML = TFS.map(t => {
+    const on = t.key === S.tab, n = S.symbols.filter(s => S.d[s] && liveRegime(S.d[s], t.key)?.state !== 'rest').length;
+    return `<button class="tab" role="tab" id="tab-${t.key}" data-tf="${t.key}" aria-selected="${on}" aria-controls="view" tabindex="${on ? 0 : -1}">${t.label}<small class="num" title="추세 구간 코인 수">${S.d[S.sel] ? n : ''}</small></button>`;
+  }).join('');
+}
+function switchTab(tf){
+  if (!TF[tf]) return;
+  S.tab = tf; store.set('cs_tab', tf);
+  if (S.plan.stopAuto) S.plan.stop = null;
+  renderTabs(); renderCards(); drawChart(); renderPlanner(true); tickCountdown();
+}
+function renderSummary(){
+  const st = S.symbols.map(s => S.d[s] && liveRegime(S.d[s], S.tab)?.state).filter(Boolean);
+  const up = st.filter(x => x === 'up').length, dn = st.filter(x => x === 'down').length, rest = st.filter(x => x === 'rest').length;
+  $('#summary').innerHTML = `<span>${BAR_NAME[S.tab]} 기준 · 추세 구간 <b class="up">${up + dn}</b>${up + dn ? ` (상승 ${up} · 하락 ${dn})` : ''} · 쉬는 구간 <b>${rest}</b></span><span class="rule">추세 효율 ${REGIME.er} 이상 + EMA50 기울기 + ${BAR_NAME[TF[S.tab].higher]} 방향이 맞을 때만 추세 구간 <button type="button" class="q" data-help="regime" aria-label="추세 구간 기준 설명">?</button></span>`;
+}
+function renderCards(){
+  $('#cards').innerHTML = S.symbols.map(s => {
+    const base = s.replace(/USDT$/,'');
+    return `
+    <article class="card rest ${s === S.sel ? 'sel' : ''}" data-s="${s}">
+      <button class="pick" data-pick="${s}" aria-label="${base} 선택" aria-pressed="${s === S.sel}"></button>
+      <button class="rm" data-rm="${s}" aria-label="${base} 추적 삭제" title="삭제">${icon('x')}</button>
+      <div class="c-top"><div class="sym">${base}<span>USDT</span></div><span class="chip rest" data-f="state">-</span><span class="chip vol" data-f="vol" hidden>변동성 급등</span><span class="chip pos" data-f="pos" hidden>보유 중</span></div>
+      <div class="c-price"><div class="px num" data-f="px"><span class="sk"></span></div><div class="chg num" data-f="chg"></div></div>
+      <div class="er">
+        <div class="er-scale num"><span><button class="term" data-help="er">추세 효율</button> <b data-f="erv">-</b></span><span>기준 ${REGIME.er.toFixed(2)}</span></div>
+        <div class="er-bar"><i data-f="erb"></i><b class="tick" style="left:${REGIME.er*100}%"></b></div>
+      </div>
+      <div class="tfrow num" data-f="tfrow" aria-label="봉별 상태"></div>
+      <dl class="stats num">
+        <div><dt><button class="term" data-help="slope">추세 기울기</button></dt><dd data-f="slope">-</dd></div>
+        <div><dt><button class="term" data-help="htrend" data-f="hlabel">상위 추세</button></dt><dd data-f="ht">-</dd></div>
+        <div><dt><button class="term" data-help="vol">변동성</button></dt><dd data-f="volr">-</dd></div>
+        <div><dt><button class="term" data-help="oi" data-f="oilabel">OI 4봉</button></dt><dd data-f="oi">-</dd></div>
+        <div><dt><button class="term" data-help="liq">1시간 청산</button></dt><dd data-f="liq">-</dd></div>
+        <div><dt><button class="term" data-help="funding">펀딩</button></dt><dd data-f="fr">-</dd></div>
+      </dl>
+    </article>`;
+  }).join('');
+  S.symbols.forEach(updateCard); renderSummary();
+}
+const triHtml = st => st === 'up' ? `<span class="up">${icon('tri-up','tri')}</span>` : st === 'down' ? `<span class="dn">${icon('tri-down','tri')}</span>` : '<span class="mt">–</span>';
+function updateCard(sym){
+  const el = document.querySelector(`.card[data-s="${sym}"]`), D = S.d[sym]; if (!el || !D) return;
+  const q = f => el.querySelector(`[data-f="${f}"]`);
+  const price = priceOf(sym), chg = +D.tk.price24hPcnt*100;
+  q('px').textContent = fmt(price);
+  q('chg').textContent = isFinite(chg) ? signed(chg, 2) + '%' : '';
+  q('chg').className = 'chg num ' + (chg >= 0 ? 'up' : 'dn');
+  const fr = parseFloat(D.tk.fundingRate);
+  q('fr').textContent = isFinite(fr) ? (fr*100).toFixed(4) + '%' : '-';
+  const oc = liveOIChange(D, S.tab);
+  q('oilabel').textContent = `OI ${TF[S.tab].short}×4`;
+  q('oi').textContent = isFinite(oc) ? signed(oc*100, 2) + '%' : '-';
+  q('oi').className = !isFinite(oc) || Math.abs(oc) < 0.0005 ? '' : oc > 0 ? 'up' : 'dn';
+  const lq = liqSum(D), lt = lq.long + lq.short;
+  q('liq').textContent = !lt ? '없음' : (lq.long >= lq.short ? '롱 ' : '숏 ') + usd(Math.max(lq.long, lq.short));
+  q('liq').className = !lt ? '' : lq.long >= lq.short ? 'dn' : 'up';
+  q('liq').title = `최근 1시간 청산 — 롱 ${usd(lq.long)} · 숏 ${usd(lq.short)} (페이지를 연 뒤부터 집계)`;
+  q('tfrow').innerHTML = TFS.map(t => `<span class="${t.key === S.tab ? 'cur' : ''}">${t.short} ${triHtml(liveRegime(D, t.key)?.state)}</span>`).join('');
+  q('hlabel').textContent = `${TF[TF[S.tab].higher]?.short || '일봉'} 추세`;
+  q('pos').hidden = !S.journal.some(j => j.status === 'open' && j.sym === sym);
+  const r = liveRegime(D, S.tab); if (!r) return;
+  el.classList.toggle('rest', r.state === 'rest');
+  el.title = regimeReason(r, S.tab);
+  q('state').className = 'chip ' + r.state; q('state').textContent = STATE_NAME[r.state];
+  q('vol').hidden = !(r.vol >= REGIME.vol);
+  q('erv').textContent = r.er.toFixed(2);
+  q('erb').style.width = Math.min(100, r.er*100) + '%'; q('erb').className = r.state === 'rest' ? '' : r.state;
+  q('slope').textContent = signed(r.slope, 2); q('slope').className = Math.abs(r.slope) < REGIME.slope ? '' : r.slope > 0 ? 'up' : 'dn';
+  q('ht').textContent = r.hT > 0 ? '상승' : r.hT < 0 ? '하락' : '횡보'; q('ht').className = r.hT > 0 ? 'up' : r.hT < 0 ? 'dn' : '';
+  q('volr').textContent = r.vol.toFixed(1) + '배'; q('volr').className = r.vol >= REGIME.vol ? 'wn' : '';
+}
+
+const pending = new Set(); let refreshQueued = false;
+function scheduleRefresh(sym){
+  pending.add(sym);
+  if (refreshQueued) return; refreshQueued = true;
+  setTimeout(() => {
+    refreshQueued = false;
+    for (const s of pending){
+      const D = S.d[s]; if (!D) continue;
+      refreshSeries(D); updateCard(s); checkTrades(s);
+      if (s === S.sel){ updateChartLast(); renderPlanner(); }
+    }
+    pending.clear(); renderSummary(); renderJournalLive();
+  }, 700);
+}
+
+/* ================= 매매 계획 ================= */
+function suggestStop(kind){
+  const D = S.d[S.sel], tf = S.tab, k = D.k[tf], i = k.length-2, a = D.ser[tf].atr[i], L = S.plan.dir === 'long';
+  const entry = S.plan.entryAuto ? priceOf(S.sel) : S.plan.entry;
+  if (kind === 'swing'){
+    let ex = L ? Infinity : -Infinity;
+    for (let j = i-9; j <= i+1; j++) ex = L ? Math.min(ex, k[j].l) : Math.max(ex, k[j].h);
+    const st = L ? ex - 0.2*a : ex + 0.2*a;
+    if (L ? st < entry : st > entry) return st;
+  }
+  return L ? entry - 2*a : entry + 2*a;
+}
+function dayR(){
+  const d0 = new Date(); d0.setHours(0,0,0,0);
+  return S.journal.filter(j => j.status === 'closed' && j.closedAt >= d0.getTime()).reduce((s,j) => s + j.R, 0);
+}
+function planCalc(){
+  const sym = S.sel, D = S.d[sym]; if (!D) return null;
+  const P = S.plan, A = S.acct, price = priceOf(sym), L = P.dir === 'long', sg = L ? 1 : -1;
+  const entry = P.entryAuto ? price : P.entry;
+  if (P.stopAuto && !P.stop) P.stop = suggestStop(P.stopAuto);
+  const stop = P.stop, tf = S.tab, i = D.k[tf].length-2, atrv = D.ser[tf].atr[i], reg = liveRegime(D, tf);
+  const base = {sym, entry, price, stop, L, atrv, reg};
+  if (!(entry > 0)) return {...base, invalid:'진입가를 입력해 주세요'};
+  if (!(stop > 0)) return {...base, invalid:'손절가를 입력해 주세요'};
+  if ((entry - stop)*sg <= 0) return {...base, invalid: L ? '롱의 손절가는 진입가보다 낮아야 해요' : '숏의 손절가는 진입가보다 높아야 해요'};
+  if (!(A.bal > 0) || !(A.risk > 0)) return {...base, invalid:'계좌 금액과 1회 위험 %를 설정해 주세요'};
+  const dist = Math.abs(entry - stop), riskUsd = A.bal*A.risk/100, qty = riskUsd/dist, notional = qty*entry;
+  const lev = Math.max(1, P.lev || 1), margin = notional/lev;
+  const liq = L ? entry*(1 - 1/lev + MMR) : entry*(1 + 1/lev - MMR);
+  const X = L ? stop - dist*0.25 : stop + dist*0.25, den = L ? 1 + MMR - X/entry : X/entry - 1 + MMR;
+  const maxLev = den > 0 ? 1/den : Infinity;
+  const fee = notional*FEE, lossIfWrong = riskUsd*(1 + SLIP_R) + fee;
+  const tp = P.tp > 0 ? P.tp : 2, tp1 = entry + sg*dist, tp2 = entry + sg*tp*dist, gain2 = qty*dist*tp - fee;
+  const streak = n => (1 - Math.pow(1 - lossIfWrong/A.bal, n))*100;
+  return {...base, dist, riskUsd, qty, notional, lev, margin, liq, maxLev, fee, lossIfWrong, tp, tp1, tp2, gain2, streak5:streak(5), streak10:streak(10)};
+}
+function planChecks(c){
+  const out = [], A = S.acct, add = (cls, txt) => out.push({cls, txt}), TFN = BAR_NAME[S.tab];
+  if (!c.reg) add('warn', '시장 상태를 계산하는 중이에요');
+  else if (c.reg.state === 'rest') add('bad', `${TFN} 기준 쉬는 구간 — 원칙상 관망할 자리예요`);
+  else if ((c.reg.state === 'up') !== c.L) add('bad', `${TFN} ${STATE_NAME[c.reg.state]}와 반대 방향이에요`);
+  else add('ok', `${TFN} ${STATE_NAME[c.reg.state]}와 같은 방향`);
+  const ax = c.dist/c.atrv;
+  if (ax < 0.7) add('bad', `손절 폭이 ATR의 ${ax.toFixed(1)}배로 좁아 흔들기에 털리기 쉬워요 (1~3배 권장)`);
+  else if (ax > 4) add('warn', `손절 폭이 ATR의 ${ax.toFixed(1)}배로 넓어요 — 수량이 그만큼 작아져요`);
+  else add('ok', `손절 폭 ATR의 ${ax.toFixed(1)}배 (${TFN})`);
+  if (c.lev > c.maxLev) add('bad', `${c.lev}배면 손절 전에 청산될 수 있어요 — ${Math.max(1, Math.floor(c.maxLev))}배 이하로`);
+  else add('ok', `예상 청산가가 손절가보다 충분히 멀어요`);
+  if (c.margin > A.bal) add('bad', `필요 증거금 ${usd(c.margin)}이 계좌보다 커요 — 레버리지를 올리거나 위험 %를 낮추세요`);
+  const dr = dayR();
+  if (dr <= -A.day) add('bad', `오늘 손실 ${money(dr*riskUsd())}로 하루 한도(−${usd(A.day*riskUsd())})에 닿았어요 — 오늘은 쉬세요`);
+  else add('ok', `오늘 실현 ${money(dr*riskUsd())} · 하루 한도 −${usd(A.day*riskUsd())}`);
+  const openN = S.journal.filter(j => j.status === 'open').length;
+  if (openN >= A.max) add('bad', `이미 ${openN}개 보유 중이에요 (동시 보유 한도 ${A.max}개)`);
+  else add('ok', `보유 ${openN}개 / 한도 ${A.max}개`);
+  if (S.journal.some(j => j.status === 'open' && j.sym === c.sym)) add('warn', `${c.sym.replace(/USDT$/,'')}는 이미 보유 중이에요`);
+  if (A.risk > 2) add('warn', `1회 위험 ${A.risk}%는 높아요 — 10번 연속 틀리면 계좌 −${c.streak10.toFixed(0)}%`);
+  if (!S.plan.note.trim()) add('warn', '틀렸다고 인정할 상황을 적어 두면 흔들기에 덜 흔들려요');
+  return out;
+}
+function renderPlanner(syncInputs){
+  const c = planCalc(), P = S.plan, A = S.acct;
+  $('#acctSum').textContent = `${usd(A.bal)} · 1회 위험 ${usd(riskUsd())} · 하루 −${usd(A.day*riskUsd())} · 최대 ${A.max}개`;
+  if (!c){ $('#plSym').textContent = '-'; return; }
+  $('#plSym').innerHTML = `${esc(c.sym.replace(/USDT$/,''))}<small class="num">현재 ${fmt(c.price)}</small>`;
+  const st = c.reg?.state || 'rest';
+  $('#plState').className = 'chip term-chip ' + st; $('#plState').textContent = `${TF[S.tab].short} ${STATE_NAME[st]}`;
+  $('#plReason').textContent = regimeReason(c.reg, S.tab);
+  $('#plLong').setAttribute('aria-pressed', P.dir === 'long'); $('#plShort').setAttribute('aria-pressed', P.dir === 'short');
+  $('.quick [data-q="swing"]').textContent = P.dir === 'long' ? '최근 저점' : '최근 고점';
+  const setIn = (id, v) => { const el = $(id); if (document.activeElement !== el) el.value = v; };
+  if (P.entryAuto || syncInputs) setIn('#plEntry', raw(c.entry));
+  if (P.stopAuto || syncInputs) setIn('#plStop', raw(c.stop));
+  if (syncInputs){ setIn('#plTp', P.tp); setIn('#plLev', P.lev); setIn('#plNote', P.note);
+    setIn('#acBal', A.bal); setIn('#acRisk', A.risk); setIn('#acDay', A.day); setIn('#acMax', A.max); $('#acSound').setAttribute('aria-checked', A.sound); }
+  if (c.invalid){
+    $('#plOut').innerHTML = ''; $('#plChecks').innerHTML = '';
+    $('#plWrong').innerHTML = `<h3>${icon('alert')}계획을 완성해 주세요</h3><p>${esc(c.invalid)}</p>`;
+    $('#plSave').disabled = true; drawPlanLines(null); return;
+  }
+  const pct = x => signed((x/c.entry - 1)*100, 2) + '%';
+  $('#plOut').innerHTML = `
+    <div><span><button class="term" data-help="qty">수량</button></span><b>${qtyFmt(c.qty)} ${esc(c.sym.replace(/USDT$/,''))}</b><em>명목 ${usd(c.notional)}</em></div>
+    <div><span><button class="term" data-help="lev">증거금 (${c.lev}배)</button></span><b>${usd(c.margin)}</b><em>예상 청산가 ${fmt(c.liq)}</em></div>
+    <div><span>손절</span><b class="dn">${fmt(c.stop)}</b><em>${pct(c.stop)} · ATR ${(c.dist/c.atrv).toFixed(1)}배</em></div>
+    <div><span>목표 (손절 폭 ×${c.tp})</span><b class="up">${fmt(c.tp2)}</b><em>${pct(c.tp2)} · 약 +${usd(c.gain2).slice(1)}</em></div>`;
+  $('#plWrong').innerHTML = `
+    <h3>${icon('alert')}예측이 틀리면 <button type="button" class="q" data-help="wrong" aria-label="손실 계산 설명">?</button></h3>
+    <p>가격이 <b class="num">${fmt(c.stop)}</b>에 닿으면 이 계획은 틀린 것입니다. 그때 손실은 약 <b class="num">${usd(c.lossIfWrong)}</b>, 계좌의 <b class="num">${(c.lossIfWrong/A.bal*100).toFixed(2)}%</b>예요 (수수료·미끄러짐 포함).</p>
+    <p>연속으로 틀리면 5번 <b class="num">−${c.streak5.toFixed(1)}%</b> · 10번 <b class="num">−${c.streak10.toFixed(1)}%</b>. <span class="mt">승률 45% 안팎의 전략도 백테스트에서 11~15번 연속 손실이 나왔어요.</span></p>`;
+  const checks = planChecks(c), bad = checks.filter(x => x.cls === 'bad').length;
+  $('#plChecks').innerHTML = checks.map(x => `<li class="${x.cls}">${icon(x.cls === 'ok' ? 'check' : x.cls === 'bad' ? 'x' : 'alert')}<span>${esc(x.txt)}</span></li>`).join('');
+  const btn = $('#plSave'); btn.disabled = false;
+  btn.className = 'btn block ' + (bad ? 'danger' : 'primary');
+  btn.textContent = bad ? `원칙과 맞지 않는 점 ${bad}개 — 그래도 기록` : '일지에 진입 기록';
+  drawPlanLines(c);
+}
+function saveTrade(){
+  const c = planCalc(); if (!c || c.invalid) return;
+  const bad = planChecks(c).filter(x => x.cls === 'bad').length;
+  S.journal.unshift({id:Date.now(), sym:c.sym, dir:c.L ? 'long' : 'short', tf:S.tab, entry:c.entry, stop:c.stop, target:c.tp2, tpR:c.tp,
+    qty:c.qty, risk:c.riskUsd, lev:c.lev, note:S.plan.note.trim(), viol:bad, regime:c.reg?.state, openedAt:Date.now(), status:'open', alerted:{}});
+  saveJournal(); S.plan.note = ''; $('#plNote').value = '';
+  renderJournal(); renderPlanner(); updateCard(c.sym); drawPlanLines(planCalc());
+  toast(`${c.sym.replace(/USDT$/,'')} ${c.L ? '롱' : '숏'} 기록 — 손절가 ${fmt(c.stop)}에 닿으면 알려 드릴게요`, 'book');
+}
+
+/* ================= 매매 일지 ================= */
+const livePnl = j => j.qty*(priceOf(j.sym) - j.entry)*(j.dir === 'long' ? 1 : -1);
+const liveR = j => { const p = priceOf(j.sym); return (p - j.entry)*(j.dir === 'long' ? 1 : -1)/Math.abs(j.entry - j.stop); };
+function journalStats(){
+  const cl = S.journal.filter(j => j.status === 'closed').sort((a,b) => a.closedAt - b.closedAt);
+  let s = 0, w = 0, pnl = 0, st = 0, ms = 0;
+  for (const j of cl){ s += j.R; pnl += j.pnl; if (j.R > 0){ w++; st = 0; } else { st++; ms = Math.max(ms, st); } }
+  return {n:cl.length, win: cl.length ? w/cl.length*100 : 0, avg: cl.length ? s/cl.length : 0, sum:s, pnl, maxStreak:ms};
+}
+function jRow(j){
+  const L = j.dir === 'long', open = j.status === 'open', r = open ? liveR(j) : j.R;
+  return `<div class="jrow ${open ? '' : 'closed'}" data-id="${j.id}">
+    <span class="dirb ${j.dir}">${icon(L ? 'up' : 'down')}</span>
+    <span class="who">${esc(j.sym.replace(/USDT$/,''))} ${L ? '롱' : '숏'}<small class="num">${fmtTime(open ? j.openedAt : j.closedAt)}${j.viol ? ' · 원칙 예외' : ''}</small></span>
+    <span class="r num ${r >= 0 ? 'up' : 'dn'}" data-live="${open ? j.id : ''}">${money(open ? livePnl(j) : j.pnl)}${rSmall(r)}</span>
+    <span class="lv num"><span>진입 <b>${fmt(j.entry)}</b></span><span>손절 <b>${fmt(j.stop)}</b></span>${open ? `<span>목표 <b>${fmt(j.target)}</b></span>` : `<span>청산 <b>${fmt(j.exit)}</b></span>`}</span>
+    <span class="act">${open ? `<button class="btn" data-close="${j.id}">청산 기록</button>` : ''}<button class="btn ghost" data-del="${j.id}" aria-label="기록 삭제" title="삭제">${icon('x')}</button></span>
+  </div>`;
+}
+function renderJournal(){
+  const open = S.journal.filter(j => j.status === 'open'), closed = S.journal.filter(j => j.status === 'closed');
+  $('#jCount').textContent = S.journal.length;
+  const st = journalStats(), dr = dayR();
+  let html = '';
+  if (dr <= -S.acct.day) html += `<div class="banner">${icon('alert')}<span>오늘 손실 ${money(dr*riskUsd())} — 하루 한도에 닿았어요. 원칙대로 오늘은 매매를 쉬세요.</span></div>`;
+  if (st.n) html += `<div class="jstats num">
+      <div><span>완료</span><b>${st.n}건</b></div>
+      <div><span>승률</span><b>${st.win.toFixed(0)}%</b></div>
+      <div><span>거래당 평균</span><b class="${st.pnl >= 0 ? 'up' : 'dn'}">${money(st.pnl/st.n)}</b></div>
+      <div><span>누적 손익</span><b class="${st.pnl >= 0 ? 'up' : 'dn'}">${money(st.pnl)}</b></div>
+    </div><p class="cap" style="margin:6px 16px 0">수수료 포함 · 최대 연속 손실 ${st.maxStreak}번 · 거래당 평균은 1회 위험금의 ${signed(st.avg, 2)}배. 이 숫자가 실력의 기준입니다.</p>`;
+  if (!S.journal.length){
+    html += `<div class="empty">${icon('book')}<strong>아직 기록이 없어요</strong><span>위에서 계획을 세우고 '일지에 진입 기록'을 누르면<br>손절·목표가에 닿을 때 알려 드리고 손익을 쌓아 갑니다.</span></div>`;
+  } else {
+    html += '<div class="list">';
+    if (open.length) html += `<h3 class="sub-h">보유 중</h3>` + open.map(jRow).join('');
+    if (closed.length) html += `<h3 class="sub-h">완료</h3>` + closed.slice(0, 50).map(jRow).join('');
+    html += '</div>';
+  }
+  $('#jBody').innerHTML = html;
+}
+function renderJournalLive(){
+  for (const el of document.querySelectorAll('[data-live]')){
+    const j = S.journal.find(x => String(x.id) === el.dataset.live); if (!j) continue;
+    const r = liveR(j); el.innerHTML = money(livePnl(j)) + rSmall(r); el.className = 'r num ' + (r >= 0 ? 'up' : 'dn');
+  }
+}
+// rng 없이 부르면 현재가로, rng={h,l,t}면 그 구간의 고가·저가로 확인 (t: 1분봉 시작 시각, gap: 끊겼던 구간)
+function checkTrades(sym, rng){
+  const p = priceOf(sym), h = rng ? rng.h : p, l = rng ? rng.l : p; if (!isFinite(h) || !isFinite(l)) return;
+  for (const j of S.journal){
+    if (j.status !== 'open' || j.sym !== sym) continue;
+    if (rng?.t != null && rng.t < j.openedAt) continue; // 진입 전 가격이 섞인 봉은 건너뛴다
+    const L = j.dir === 'long';
+    if (!j.alerted.stop && (L ? l <= j.stop : h >= j.stop)){ j.alerted.stop = true; saveJournal(); alertTrade(j, 'stop', rng?.gap); }
+    else if (!j.alerted.target && (L ? h >= j.target : l <= j.target)){ j.alerted.target = true; saveJournal(); alertTrade(j, 'target', rng?.gap); }
+  }
+}
+// 시세가 끊겼던 구간을 1분봉 이력으로 다시 확인
+async function handleGap(from, to){
+  S.gaps.unshift({from, to}); S.gaps = S.gaps.slice(0, 5);
+  const open = S.journal.filter(j => j.status === 'open');
+  toast(`${agoTxt(to - from).replace(' 전', '')} 동안 시세가 끊겼다가 다시 들어와요${open.length ? ' — 그 사이 보유 종목을 다시 확인할게요' : ''}`, 'alert');
+  for (const sym of new Set(open.map(j => j.sym))){
+    const start = Math.max(from, Math.min(...open.filter(j => j.sym === sym).map(j => j.openedAt))) - 60e3;
+    try{
+      const r = await getJSON(`/v5/market/kline?category=linear&symbol=${sym}&interval=1&start=${start}&end=${to}&limit=1000`);
+      const bars = r.list.map(parseK); if (!bars.length) continue;
+      checkTrades(sym, {h: Math.max(...bars.map(b => b.h)), l: Math.min(...bars.map(b => b.l)), gap:{from, to}});
+    }catch(e){ toast(`${sym} 끊긴 구간 확인 실패 — 거래소 화면에서 직접 확인하세요`, 'alert'); }
+  }
+}
+function closeTrade(j, exit){
+  const sg = j.dir === 'long' ? 1 : -1, fee = j.qty*j.entry*FEE;
+  j.exit = exit; j.pnl = j.qty*(exit - j.entry)*sg - fee; j.R = j.pnl/j.risk; j.status = 'closed'; j.closedAt = Date.now();
+  saveJournal(); renderJournal(); renderPlanner(); updateCard(j.sym); drawPlanLines(planCalc());
+}
+
+/* ================= 용어 설명 ================= */
+// 각 항목: t 제목, sub 한 줄 요약, b() 본문 (가능하면 지금 계획·코인 숫자로 예시를 든다)
+const helpPlan = () => { const c = planCalc(); return c && !c.invalid ? c : null; };
+const coinName = () => (S.sel || '').replace(/USDT$/, '');
+const exTable = rows => `<table class="ex num">${rows.map(r => `<tr><th>${r[0]}</th><td class="${r[2] || ''}">${r[1]}</td></tr>`).join('')}</table>`;
+const HELP = {
+  watch: {t:'감시 상태', sub:'"알림 켜짐"은 알림을 보낼 권한이 있다는 뜻이고, "감시 정상"은 지금 실제로 시세를 받아 손절·목표가를 확인하고 있다는 뜻이에요.',
+    b: () => { const w = watchState(), name = {ok:'감시 정상', lag:'지연', stop:'감시 중단'}[w.state];
+      const rows = w.rows.slice().sort((a,b) => b.held - a.held);
+      return `${exTable([['지금 상태', name, w.state === 'ok' ? 'up' : w.state === 'stop' ? 'dn' : ''], ['마지막 시세', agoTxt(w.last)], ['감시 중인 보유 종목', w.held.length ? w.held.map(s => s.replace(/USDT$/,'')).join(', ') : '없음'], ['브라우저 알림 권한', !('Notification' in window) ? '미지원' : Notification.permission === 'granted' ? '허용됨' : Notification.permission === 'denied' ? '차단됨' : '아직 안 정함']])}
+      <p class="ex-h">종목별 마지막 시세</p>
+      ${exTable(rows.map(r => [r.s.replace(/USDT$/,'') + (r.held ? ' · 보유' : ''), r.untracked ? '추적 목록에서 빠져 감시 안 됨' : agoTxt(r.age), r.untracked || (r.held && r.age > HELD_LAG_MS) ? 'dn' : '']))}
+      <p class="ex-h">감시가 되는 조건</p>
+      <ol><li>이 페이지(탭)가 열려 있어야 해요. 다른 탭을 봐도 되지만, 탭을 닫거나 PC가 절전·잠금 상태면 멈춰요.</li>
+      <li>시세가 들어와야 해요. ${LAG_MS/1000}초 넘게 안 들어오면 <b class="wn">지연</b>, ${STALE_MS/1000}초 넘으면 <b class="dn">감시 중단</b>으로 바뀌고 자동으로 다시 연결해요.</li>
+      <li>끊겼다가 돌아오면 그 사이 1분봉의 고가·저가로 손절·목표가를 지났는지 다시 확인해 알려 드려요.${S.gaps.length ? ` 최근 끊김: ${S.gaps.map(g => `${fmtTime(g.from)}~${fmtTime(g.to)}`).join(', ')}` : ''}</li>
+      <li>윈도우 알림은 권한이 있어도 방해 금지·집중 지원이 켜져 있으면 안 뜰 수 있어요. 위의 <b>테스트 알림</b>으로 확인하세요.</li></ol>
+      <p class="caveat">이 페이지는 거래소의 손절 주문을 대신하지 못해요. 실제 손절은 거래소에 스탑 주문으로 걸어 두고, 이 알림은 보조로 쓰세요.</p>`; }},
+  regime: {t:'추세 구간과 쉬는 구간', sub:'"방향이 없는 구간에서는 쉰다"는 원칙을 숫자로 옮긴 기준이에요.',
+    b: () => { const D = S.d[S.sel], r = D && liveRegime(D, S.tab), HB = BAR_NAME[TF[S.tab].higher];
+      return `<p>아래 세 가지가 <b>모두</b> 맞을 때만 추세 구간, 하나라도 어긋나면 쉬는 구간이에요. 마감된 봉 기준이라 봉 중간에 바뀌지 않습니다.</p>
+      <ol><li><button class="term" data-help="er">추세 효율</button>이 ${REGIME.er} 이상 — 오르내림보다 한 방향 이동이 많음</li>
+      <li><button class="term" data-help="slope">추세 기울기</button>가 ±${REGIME.slope} 이상 — EMA50이 뚜렷하게 기울어 있음</li>
+      <li>${HB} 추세가 반대가 아니고, 가격이 EMA50의 같은 쪽에 있음</li></ol>
+      ${r ? `<p class="ex-h">지금 ${esc(coinName())} (${BAR_NAME[S.tab]})</p>${exTable([['상태', STATE_NAME[r.state], r.state === 'up' ? 'up' : r.state === 'down' ? 'dn' : ''], ['추세 효율', r.er.toFixed(2) + (r.er >= REGIME.er ? ' ✓' : ' ✗')], ['추세 기울기', signed(r.slope, 2) + (Math.abs(r.slope) >= REGIME.slope ? ' ✓' : ' ✗')], [`${HB} 추세`, r.hT > 0 ? '상승' : r.hT < 0 ? '하락' : '횡보']])}` : ''}
+      <p class="caveat">추세 구간이라고 돈을 번다는 뜻은 아니에요. 백테스트에서 추세 구간만 골라도 지표 신호는 손실이었습니다. 이 구분은 "들어가지 말아야 할 때"를 거르는 용도예요.</p>`; }},
+  er: {t:'추세 효율', sub:'20봉 동안 실제로 이동한 거리 ÷ 오르내린 거리의 합. 0~1 사이 값이에요.',
+    b: () => `<p>가격이 20봉 동안 한 방향으로 곧게 갔다면 1, 제자리에서 지그재그만 했다면 0에 가까워요.</p>
+      ${exTable([['20봉 동안 +10 올랐고 오르내림 합도 10', '1.00 · 일직선 추세', 'up'], ['+3 올랐지만 오르내림 합은 15', '0.20 · 난잡한 구간'], ['오르내림 합 20인데 제자리', '0.00 · 방향 없음']])}
+      <p>${REGIME.er} 이상이어야 추세 구간 후보가 돼요. 카드의 막대에서 세로선이 이 기준이에요.</p>` },
+  slope: {t:'추세 기울기', sub:'EMA50이 최근 10봉 동안 얼마나 움직였는지를 ATR(평균 변동폭) 단위로 잰 값이에요.',
+    b: () => `<p>+0.5면 10봉 동안 EMA50이 평소 한 봉 변동폭의 절반만큼 올랐다는 뜻이에요. 코인마다 가격대와 변동성이 달라서 ATR로 나눠 비교합니다.</p>
+      ${exTable([[`+${REGIME.slope} 이상`, '상승 기울기', 'up'], [`−${REGIME.slope} ~ +${REGIME.slope}`, '거의 평평 → 쉬는 구간'], [`−${REGIME.slope} 이하`, '하락 기울기', 'dn']])}` },
+  htrend: {t:'상위 추세', sub:'지금 보는 봉보다 한 단계 긴 봉의 방향이에요.',
+    b: () => `<p>${TFS.map(t => `${t.label} 탭 → ${BAR_NAME[t.higher]}`).join(' · ')}을 봅니다. 상위 봉에서 가격이 EMA50 위이고 EMA20도 EMA50 위면 <b class="up">상승</b>, 둘 다 아래면 <b class="dn">하락</b>, 섞여 있으면 횡보예요.</p>
+      <p>큰 흐름을 거스르는 매매를 거르기 위한 확인이에요. 상위 봉이 하락인데 짧은 봉에서 롱을 잡으면 "원칙 확인"에서 경고가 나옵니다.</p>` },
+  vol: {t:'변동성', sub:'최근 한 봉의 변동폭(ATR)이 지난 100봉 평균의 몇 배인지예요.',
+    b: () => `<p>1.0배면 평소와 같고, ${REGIME.vol}배 이상이면 카드에 <span class="chip vol">변동성 급등</span>이 붙어요.</p>
+      <p>변동성이 클 때는 손절가에 정확히 체결되지 않고 더 불리하게 밀리기 쉬워요(미끄러짐). 같은 계좌 위험이면 손절 폭이 넓어져 수량도 줄여야 합니다.</p>` },
+  oi: {t:'미결제약정 (OI)', sub:'아직 정리되지 않고 열려 있는 선물 포지션의 총량이에요.',
+    b: () => `<p>카드에는 최근 4봉 동안의 OI 변화율을 보여 줘요. 가격과 함께 보면 누가 움직이는지 짐작할 수 있어요.</p>
+      ${exTable([['가격 ↑ + OI ↑', '새 롱이 들어오며 상승'], ['가격 ↑ + OI ↓', '숏이 손절·청산되며 상승 (숏 커버)'], ['가격 ↓ + OI ↑', '새 숏이 들어오며 하락'], ['가격 ↓ + OI ↓', '롱이 손절·청산되며 하락']])}
+      <p class="caveat">백테스트에서 이런 조합만으로 꾸준히 돈을 번 규칙은 찾지 못했어요. 상황 파악용으로만 보세요.</p>` },
+  liq: {t:'1시간 청산', sub:'최근 1시간 동안 강제 청산된 포지션 금액이에요 (Bybit 실시간).',
+    b: () => `<p><b class="dn">롱 $1.2M</b>이면 롱 포지션이 더 많이 청산됐다는 뜻으로, 가격이 내려가며 롱이 털렸다는 의미예요. <b class="up">숏</b>이면 반대로 올라가며 숏이 털린 거예요.</p>
+      <p>Bybit가 과거 청산 기록을 무료로 주지 않아서, <b>이 페이지를 연 뒤부터</b> 모은 값이에요. 방금 열었다면 "없음"으로 보일 수 있어요.</p>` },
+  funding: {t:'펀딩비', sub:'무기한 선물 가격을 현물 가격에 붙여 두려고 8시간마다 롱과 숏이 주고받는 비용이에요.',
+    b: () => `<p><b>양수</b>면 롱이 숏에게 내고, <b>음수</b>면 숏이 롱에게 내요. 한쪽이 크게 치우치면 그쪽 포지션이 몰려 있다는 신호로 봅니다.</p>
+      ${exTable([['+0.0100%', '보통 수준 (기본값)'], ['+0.05% 이상', '롱 과밀 — 롱이 비싼 비용을 냄', 'dn'], ['음수', '숏 과밀 — 숏이 비용을 냄', 'up']])}
+      <p>보유하는 동안 실제로 계좌에서 오가는 돈이라, 오래 들고 갈수록 손익에 영향을 줘요.</p>` },
+  entry: {t:'진입가', sub:'들어갈 가격이에요.',
+    b: () => `<p><b>현재가 따라가기</b>를 누르면 실시간 가격을 계속 따라가요. 직접 숫자를 입력하면 그 가격으로 고정되고, 지정가 주문을 미리 계획할 때 쓰면 됩니다.</p>
+      <p>진입가가 바뀌면 손절까지의 거리가 바뀌어 수량도 다시 계산돼요.</p>` },
+  stop: {t:'손절가 — 틀렸다고 볼 가격', sub:'이 가격에 닿으면 "내 예측이 틀렸다"고 미리 정해 두는 가격이에요.',
+    b: () => { const c = helpPlan();
+      return `<p>진입 전에 정해야 흔들기에 버티거나 손절을 미루지 않게 돼요. 이 페이지는 손절가에 닿으면 팝업과 소리로 알려 줍니다.</p>
+      ${exTable([['최근 저점/고점', '최근 10봉의 저점(숏은 고점)보다 ATR의 0.2배 더 바깥'], ['2×ATR', '진입가에서 평소 변동폭의 2배 거리']])}
+      <p>너무 좁으면(ATR의 0.7배 미만) 평소 흔들림에도 걸리고, 너무 넓으면(4배 초과) 수량이 작아져요. "원칙 확인"에서 알려 줍니다.</p>
+      ${c ? `<p class="ex-h">지금 계획</p>${exTable([['손절가', fmt(c.stop), 'dn'], ['진입가와의 거리', `${fmt(c.dist)} (${(c.dist/c.entry*100).toFixed(2)}%)`], ['ATR 대비', (c.dist/c.atrv).toFixed(1) + '배']])}` : ''}`; }},
+  tp: {t:'목표 · 손익비', sub:'목표가를 "손절까지 거리의 몇 배" 떨어진 곳에 둘지 정하는 값이에요.',
+    b: () => { const c = helpPlan(), A = S.acct;
+      return `<p>2를 넣으면 손절까지 거리의 2배만큼 떨어진 곳이 목표가가 돼요. 틀리면 위험금만큼 잃고, 맞으면 위험금의 2배를 버는 구조예요.</p>
+      ${c ? `<p class="ex-h">지금 계획 (${esc(coinName())} ${c.L ? '롱' : '숏'}, 목표 ${c.tp})</p>${exTable([['진입가', fmt(c.entry)], ['손절가 · 거리', `${fmt(c.stop)} · ${fmt(c.dist)}`, 'dn'], ['목표가', `${fmt(c.tp2)} = 진입가 ${c.L ? '+' : '−'} ${fmt(c.dist)} × ${c.tp}`, 'up'], ['틀리면', `약 −${usd(c.riskUsd)}`, 'dn'], ['맞으면', `약 +${usd(c.riskUsd*c.tp)}`, 'up']])}` : ''}
+      ${exTable([['1', '본전이 되려면 절반 넘게 맞혀야 함'], ['2', '3번 중 1번 조금 넘게 맞혀도 본전'], ['3', '4번 중 1번만 맞혀도 본전 · 대신 목표가 멀어 닿기 어려움']])}
+      <p class="caveat">숫자를 키울수록 목표는 멀어지고 맞히는 비율은 떨어져요. 수수료가 있어서 실제 본전 승률은 조금 더 높습니다.</p>`; }},
+  lev: {t:'레버리지와 예상 청산가', sub:'손절을 지키면 레버리지는 손실 크기를 바꾸지 않아요. 바꾸는 건 묶이는 증거금과 청산가예요.',
+    b: () => { const c = helpPlan();
+      return `<p>수량은 "1회 위험금 ÷ 손절 폭"으로 정해지기 때문에, 레버리지를 올려도 손절에 걸렸을 때 잃는 돈은 같아요. 대신 증거금이 줄고, <b>예상 청산가가 진입가에 가까워져요</b>.</p>
+      <p>청산가가 손절가보다 안쪽에 있으면 손절이 걸리기 전에 강제 청산될 수 있어요. 그래서 청산가가 손절가보다 손절 폭의 25% 이상 더 바깥에 있어야 통과로 봅니다.</p>
+      ${c ? `<p class="ex-h">지금 계획</p>${exTable([['레버리지', c.lev + '배'], ['증거금', usd(c.margin)], ['예상 청산가', fmt(c.liq), 'dn'], ['손절가', fmt(c.stop)], ['안전한 최대 레버리지', isFinite(c.maxLev) ? Math.max(1, Math.floor(c.maxLev)) + '배' : '제한 없음']])}` : ''}
+      <p class="caveat">청산가는 유지증거금률 0.5%로 근사한 값이에요. 거래소 화면의 청산가를 꼭 다시 확인하세요.</p>`; }},
+  qty: {t:'수량과 명목 금액', sub:'수량 = 1회 위험금 ÷ 손절까지의 가격 거리',
+    b: () => { const c = helpPlan();
+      return `<p>손절에 걸렸을 때 정확히 위험금만큼 잃도록 수량을 거꾸로 계산해요. 손절이 가까우면 수량이 커지고, 멀면 작아져요.</p>
+      ${c ? `<p class="ex-h">지금 계획</p>${exTable([['1회 위험금', usd(c.riskUsd)], ['손절까지 거리', fmt(c.dist)], ['수량', `${usd(c.riskUsd)} ÷ ${fmt(c.dist)} = ${qtyFmt(c.qty)} ${esc(coinName())}`], ['명목 금액', `${qtyFmt(c.qty)} × ${fmt(c.entry)} = ${usd(c.notional)}`]])}` : ''}
+      <p>명목 금액은 실제로 움직이는 포지션 크기이고, 이걸 레버리지로 나눈 게 증거금이에요.</p>`; }},
+  wrong: {t:'예측이 틀리면 — 손실 계산', sub:'손절에 걸렸을 때 실제로 잃을 돈과, 연속으로 틀릴 때의 계좌 변화를 미리 보여 줘요.',
+    b: () => { const c = helpPlan();
+      return `${c ? exTable([['1회 위험금', usd(c.riskUsd)], ['손절 미끄러짐 (위험금의 20% 가정)', usd(c.riskUsd*SLIP_R)], ['수수료 (명목의 0.11%)', usd(c.fee)], ['합계', usd(c.lossIfWrong), 'dn']]) : ''}
+      <p>급하게 움직일 때는 손절가보다 불리하게 체결되는 일이 잦아서 20%를 더 잡았어요.</p>
+      <p><b>연속 손실</b>은 매번 남은 계좌에서 같은 비율을 잃는다고 보고 계산해요. 승률 45% 안팎의 전략도 백테스트에서 11~15번 연속 손실이 나왔으니, 10번 연속 틀려도 버틸 수 있는 크기인지 확인하세요.</p>`; }},
+  checks: {t:'원칙 확인', sub:'기록하기 전에 세운 원칙과 맞는지 자동으로 확인해요.',
+    b: () => `<ul class="legend-list"><li>${icon('check')}<span>원칙과 맞아요</span></li><li class="bad">${icon('x')}<span>원칙과 어긋나요 — 기록은 되지만 일지에 "원칙 예외"로 남아요</span></li><li class="warn">${icon('alert')}<span>주의할 점이에요</span></li></ul>
+      <p>확인 항목: 쉬는 구간·추세 방향, 손절 폭(ATR 대비), 청산가와 손절가 거리, 증거금, 하루 손실 한도, 동시 보유 한도, 메모 작성.</p>
+      <p>나중에 일지에서 "원칙 예외" 매매만의 손익을 보면, 원칙을 어겼을 때 실제로 어땠는지 확인할 수 있어요.</p>` },
+  risk: {t:'1회 위험 · 위험금', sub:'한 번 틀렸을 때 잃어도 되는 금액을 계좌의 %로 정한 값이에요.',
+    b: () => { const A = S.acct;
+      return `<p>지금 설정: 계좌 ${usd(A.bal)} × ${A.risk}% = <b>1회 위험금 ${usd(riskUsd())}</b>. 모든 계획의 수량이 이 금액에 맞춰 계산돼요.</p>
+      <p>일지와 모의 기록의 "위험금의 n배"는 손익을 이 금액으로 나눈 값이에요(트레이더들이 R이라고 부르는 단위). +2배면 위험금의 두 배를 번 거예요.</p>
+      ${exTable([['0.5%', '최악 낙폭 약 18% (95% 경우)'], ['1%', '최악 낙폭 약 33%'], ['2%', '최악 낙폭 약 56%', 'dn']])}
+      <p class="caveat">위 숫자는 연구에서 쓴 실험 규칙의 거래를 2,000번 무작위로 섞어 본 결과예요. 보통 0.5~1%를 권합니다.</p>`; }},
+  day: {t:'하루 손실 한도', sub:'하루에 이만큼 잃으면 그날은 매매를 멈추는 기준이에요.',
+    b: () => { const A = S.acct;
+      return `<p>지금 설정: 위험금 ${usd(riskUsd())} × ${A.day} = <b>하루 −${usd(A.day*riskUsd())}</b>. 오늘 청산한 매매의 손익 합이 이 금액에 닿으면 일지에 "오늘은 쉬세요" 배너가 뜨고, 계획을 기록할 때 경고가 나와요.</p>
+      <p>연속으로 틀린 날 손실을 만회하려고 무리하게 들어가는 것(복수 매매)을 막기 위한 장치예요.</p>`; }},
+  max: {t:'동시 보유 한도', sub:'한 번에 들고 있을 수 있는 포지션 수예요.',
+    b: () => `<p>코인들은 같이 움직이는 경우가 많아서, 여러 코인을 동시에 잡으면 사실상 한 번에 몇 배 크게 베팅하는 셈이에요. 급락하는 날엔 전부 함께 손절될 수 있어요.</p>
+      <p class="caveat">연구에서도 한 규칙이 개별 거래로는 플러스였지만, 동시 보유를 2개로 제한하자 손실로 바뀌었어요. 한도는 작게 두는 걸 권합니다.</p>` },
+  journal: {t:'매매 일지 숫자 읽는 법', sub:'"돈이 기준"이라는 원칙대로, 실제 손익으로 실력을 잽니다.',
+    b: () => `${exTable([['+$5.01', '손익 금액 (보유 중이면 현재가 기준, 완료면 수수료 포함)'], ['위험금의 +0.50배', `손익 ÷ 1회 위험금. 지금 위험금 ${usd(riskUsd())} 기준 +0.5배 = +${usd(riskUsd()*0.5)}`], ['승률', '완료된 매매 중 수익 난 비율'], ['최대 연속 손실', '가장 길게 연속으로 진 횟수'], ['원칙 예외', '원칙 확인에서 어긋난 항목이 있었던 매매']])}
+      <p>승률이 낮아도 "거래당 평균"이 플러스면 돈을 버는 방식이고, 승률이 높아도 평균이 마이너스면 잃는 방식이에요.</p>` },
+  paper: {t:'실험 규칙 · 모의 기록', sub:'돈을 걸지 않고, 후보 규칙이 앞으로도 통하는지 지켜보는 기록이에요.',
+    b: () => `<p><b>규칙:</b> 1시간봉 한 봉에 평소 변동폭(ATR)보다 크게 급락하면서 <button class="term" data-help="oi">미결제약정</button>이 평소보다 크게 줄어들 때(롱 청산 추정), 일봉 추세가 상승이 아니면 롱.</p>
+      <p><b>왜 알림이 없나요?</b> 250일 연구에서 개별 거래 평균은 위험금의 +0.14배였지만, 실제처럼 동시 보유를 2개로 제한하자 −0.11배로 손실이었어요. 아직 돈을 걸 근거가 부족해요.</p>
+      <p><b>어떻게 판단하나요?</b> 실시간 완료가 30건 이상 쌓이고 거래당 평균이 플러스로 유지되는지 보세요. 그 전에는 우연과 구분하기 어려워요. 페이지가 켜져 있을 때만 기록됩니다.</p>` },
+};
+
+/* ================= 알림 · 팝업 ================= */
+let actx;
+function beep(kind){
+  if (!S.acct.sound) return;
+  try{
+    actx = actx || new AudioContext(); if (actx.state === 'suspended') actx.resume();
+    const tones = kind === 'target' ? [660, 880, 1100] : [880, 660, 440];
+    tones.forEach((fq, n) => {
+      const o = actx.createOscillator(), g = actx.createGain(), st = actx.currentTime + n*0.16;
+      o.type = 'sine'; o.frequency.value = fq; o.connect(g); g.connect(actx.destination);
+      g.gain.setValueAtTime(0.0001, st); g.gain.exponentialRampToValueAtTime(0.25, st+0.02); g.gain.exponentialRampToValueAtTime(0.0001, st+0.15);
+      o.start(st); o.stop(st+0.16);
+    });
+  }catch(e){}
+}
+function alertTrade(j, kind, gap){
+  beep(kind);
+  const name = `${j.sym.replace(/USDT$/,'')} ${j.dir === 'long' ? '롱' : '숏'}`, gapTxt = gap ? ' (감시가 끊겼던 사이에 닿음)' : '';
+  if ('Notification' in window && Notification.permission === 'granted'){
+    try{ const n = new Notification((kind === 'stop' ? `${name} 손절가 도달` : `${name} 목표가 도달`) + gapTxt, {body: kind === 'stop' ? `계획한 손절가 ${fmt(j.stop)}에 닿았습니다. 계획대로 정리하세요.` : `목표가 ${fmt(j.target)}에 닿았습니다.`, tag:'j'+j.id+kind, requireInteraction:true}); n.onclick = () => { window.focus(); n.close(); }; }catch(e){}
+  }
+  S.queue.push({type:kind, j, gap}); if (!S.modalOpen) showNext();
+}
+let lastFocus = null;
+function openOverlay(){
+  if (!S.modalOpen) lastFocus = document.activeElement;
+  S.modalOpen = true; $('#ov').classList.add('show');
+  requestAnimationFrame(() => ($('#modal input') || $('#modal .btn.primary'))?.focus());
+}
+function closeOverlay(){
+  S.modalOpen = false; $('#ov').classList.remove('show');
+  if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
+}
+function showNext(){
+  const it = S.queue.shift();
+  if (!it){ S.cur = null; closeOverlay(); return; }
+  S.cur = it; renderModal(it); openOverlay();
+}
+// 용어 설명 팝업: 알림 팝업이 떠 있으면 설명을 본 뒤 그 알림으로 돌아온다
+function showHelp(key){
+  if (!HELP[key]) return;
+  if (S.modalOpen && S.cur && S.cur.type !== 'help') S.queue.unshift(S.cur);
+  S.queue.unshift({type:'help', key}); showNext();
+}
+function renderModal(it){
+  if (it.type === 'help'){
+    const h = HELP[it.key], m = $('#modal');
+    m.className = 'modal help';
+    m.innerHTML = `<div class="m-h"><h2 id="mTitle">${h.t}</h2>${h.sub ? `<div class="m-sub">${h.sub}</div>` : ''}</div>
+      <div class="m-b help-b">${h.b()}</div>
+      <div class="m-f"><button class="btn primary" data-act="ok">확인</button></div>`;
+    m.onclick = e => { const k = e.target.closest('[data-help]')?.dataset.help; if (k){ S.queue.unshift({type:'help', key:k}); showNext(); return; }
+      if (e.target.closest('[data-act]')) showNext(); };
+    return;
+  }
+  const j = it.j, L = j.dir === 'long', m = $('#modal'), name = j.sym.replace(/USDT$/,'');
+  const badge = `<span class="side-badge ${j.dir}">${icon(L ? 'up' : 'down')}${L ? '롱' : '숏'}</span>`;
+  const note = j.note ? `<blockquote>진입할 때 적은 메모: ${esc(j.note)}</blockquote>` : '';
+  if (it.type === 'close'){
+    const p = priceOf(j.sym);
+    m.className = 'modal';
+    m.innerHTML = `<div class="m-h"><h2 id="mTitle">${esc(name)} ${badge} 청산 기록</h2><div class="m-sub">실제로 정리한 가격을 적으면 손익을 일지에 남깁니다.</div></div>
+      <div class="m-b"><div class="f"><label for="mExit">청산가</label><div class="inp"><input id="mExit" inputmode="decimal" value="${raw(p)}"></div></div>
+      <div class="kv num" id="mPrev"></div>${note}</div>
+      <div class="m-f"><button class="btn" data-act="cancel">취소</button><button class="btn primary" data-act="save">기록</button></div>`;
+    const prev = () => { const x = num($('#mExit').value), sg = L ? 1 : -1, pnl = j.qty*(x - j.entry)*sg - j.qty*j.entry*FEE, r = pnl/j.risk;
+      $('#mPrev').innerHTML = isFinite(x) ? `<div><span>손익 (수수료 포함)</span><b class="${pnl >= 0 ? 'up' : 'dn'}">${money(pnl)}</b></div><div><span>1회 위험금 ${usd(j.risk)} 대비</span><b class="${r >= 0 ? 'up' : 'dn'}">${signed(r, 2)}배</b></div>` : ''; };
+    $('#mExit').oninput = prev; prev();
+    m.onclick = e => { const a = e.target.closest('[data-act]')?.dataset.act; if (!a) return;
+      if (a === 'save'){ const x = num($('#mExit').value); if (!(x > 0)){ $('#mExit').focus(); return; } closeTrade(j, x); toast(`${name} 청산 기록 완료`, 'check'); }
+      showNext(); };
+    return;
+  }
+  const stop = it.type === 'stop';
+  m.className = 'modal ' + it.type;
+  m.innerHTML = `<div class="m-h"><h2 id="mTitle">${esc(name)} ${badge} ${stop ? '손절가 도달' : '목표가 도달'}</h2>
+      <div class="m-sub">${stop ? `미리 정한 손절가 <b class="num">${fmt(j.stop)}</b>에 닿았습니다. 이 가격에서 예측이 틀린 것으로 정했어요. 버티면 손실이 계획보다 커집니다.` : `목표가 <b class="num">${fmt(j.target)}</b>(손절 폭의 ${j.tpR}배)에 닿았습니다. 계획대로 익절할지 정하세요.`}${it.gap ? `<p class="gapnote">${icon('alert')}<span>시세가 끊겼던 ${fmtTime(it.gap.from)}~${fmtTime(it.gap.to)} 사이에 닿았어요. 지금은 가격이 돌아왔을 수 있으니 거래소 화면에서 포지션을 꼭 확인하세요.</span></p>` : ''}</div></div>
+    <div class="m-b"><div class="kv num"><div><span>진입</span><b>${fmt(j.entry)}</b></div><div><span>현재</span><b class="${liveR(j) >= 0 ? 'up' : 'dn'}">${fmt(priceOf(j.sym))} · ${money(livePnl(j))}</b></div></div>${note}</div>
+    <div class="m-f"><button class="btn" data-act="later">나중에</button><button class="btn primary" data-act="close">청산 기록</button></div>`;
+  m.onclick = e => { const a = e.target.closest('[data-act]')?.dataset.act; if (!a) return;
+    if (a === 'close'){ S.queue.unshift({type:'close', j}); } showNext(); };
+}
+
+/* ================= 실험 규칙 패널 ================= */
+function renderPaper(){
+  const bt = paperBacktest(), live = S.paper, open = live.filter(p => p.status === 'open'), done = live.filter(p => p.status === 'closed');
+  const la = done.length ? done.reduce((s,p) => s + p.R, 0)/done.length : 0;
+  const cell = (label, v, cls='') => `<div><span>${label}</span><b class="${cls}">${v}</b></div>`;
+  // 모의 손익은 지금 계좌 설정의 1회 위험금으로 환산해 보여 준다
+  const rv = x => `${money(x*riskUsd())}${rSmall(x)}`, ru = usd(riskUsd());
+  $('#pp').innerHTML = `
+    <p class="rulebox">1시간봉 한 봉에 1ATR 넘게 급락하면서 미결제약정이 평소보다 급감(z −2 이하, 롱 청산 추정)하고, 일봉 추세가 상승이 아닐 때 롱 · 손절 2×ATR · 목표는 손절 폭의 3배 · 48봉 뒤 정리.</p>
+    <div class="pgrid num">${cell(`백테스트 ${Math.round(bt.days)}일`, bt.n + '건')}${cell('거래당 평균', bt.n ? rv(bt.avg) : '-', bt.avg >= 0 ? 'up' : 'dn')}${cell('누적', bt.n ? rv(bt.sum) : '-', bt.sum >= 0 ? 'up' : 'dn')}</div>
+    <div class="pgrid num">${cell('실시간 진행 중', open.length + '건')}${cell('실시간 완료', done.length + '건')}${cell('거래당 평균', done.length ? rv(la) : '-', la >= 0 ? 'up' : 'dn')}</div>
+    <p class="cap">금액은 지금 계좌 설정의 1회 위험금(<b>${ru}</b>, 손절에 걸리면 잃는 돈)으로 환산한 값이에요. 250일 연구에서 거래당 위험금의 <b>+0.14배</b>(수수료·손절 미끄러짐 포함)였지만, 동시 보유를 2개로 제한하면 <b>−0.11배</b>로 손실이었어요. 그래서 알림 없이 기록만 합니다. 실시간 완료가 <b>30건 이상</b> 쌓이고 플러스일 때 다시 판단하세요. 페이지가 켜져 있는 동안만 기록돼요.</p>
+    ${live.length ? `<div style="margin-top:10px">${live.slice(0, 6).map(p => `<div class="jrow" style="padding:8px 0"><span class="dirb long">${icon('up')}</span><span class="who">${esc(p.sym.replace(/USDT$/,''))}<small class="num">${fmtTime(p.t + IV_MS[PAPER.tf])}</small></span><span class="r num ${p.status === 'open' ? 'mt' : p.R >= 0 ? 'up' : 'dn'}">${p.status === 'open' ? '진행 중' : money(p.R*riskUsd())}</span><span class="lv num"><span>진입 <b>${fmt(p.entry)}</b></span>${p.how ? `<span>${p.how}</span>` : ''}</span></div>`).join('')}</div>` : ''}`;
+}
+
+/* ================= 차트 ================= */
+const TZ = -new Date().getTimezoneOffset()*60;
+const ts = t => Math.floor(t/1000) + TZ;
+const tok = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let chart, cs, l20, l50, l200, planLines = [], planKey = '';
+function initChart(){
+  if (!window.LightweightCharts){ $('#chart').innerHTML = `<div class="empty">${icon('alert')}<strong>차트를 불러오지 못했어요</strong><span>인터넷 연결을 확인한 뒤 새로고침해 주세요.</span></div>`; return; }
+  chart = LightweightCharts.createChart($('#chart'), {
+    layout:{background:{color:tok('--surface')}, textColor:tok('--muted'), fontFamily:'"Pretendard Variable",Pretendard,sans-serif', fontSize:11},
+    grid:{vertLines:{color:'rgba(255,255,255,.035)'}, horzLines:{color:'rgba(255,255,255,.035)'}},
+    timeScale:{timeVisible:true, secondsVisible:false, borderColor:tok('--line')},
+    rightPriceScale:{borderColor:tok('--line')}, crosshair:{mode:0}, autoSize:true,
+  });
+  const up = tok('--long'), dn = tok('--short');
+  cs = chart.addCandlestickSeries({upColor:up, downColor:dn, borderVisible:false, wickUpColor:up, wickDownColor:dn});
+  const lo = c => ({color:c, lineWidth:1, priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false});
+  l20 = chart.addLineSeries(lo(tok('--ema20'))); l50 = chart.addLineSeries(lo(tok('--ema50'))); l200 = chart.addLineSeries(lo(tok('--ema200')));
+}
+function drawChart(){
+  const D = S.d[S.sel];
+  $('#chartTitle').innerHTML = S.sel ? `${esc(S.sel)} <span>${TF[S.tab].label}</span>` : '차트';
+  if (!chart || !D) return;
+  const k = D.k[S.tab], s = D.ser[S.tab], p = k[k.length-1].c, d = p >= 1000 ? 1 : p >= 100 ? 2 : p >= 1 ? 4 : p >= 0.01 ? 5 : 8;
+  cs.applyOptions({priceFormat:{type:'price', precision:d, minMove:1/10**d}});
+  cs.setData(k.map(b => ({time:ts(b.t), open:b.o, high:b.h, low:b.l, close:b.c})));
+  const line = arr => k.map((b,i) => ({time:ts(b.t), value:arr[i]})).filter(x => isFinite(x.value));
+  l20.setData(line(s.e20)); l50.setData(line(s.e50)); l200.setData(line(s.e200));
+  planKey = ''; drawPlanLines(planCalc()); chart.timeScale().scrollToRealTime();
+}
+function updateChartLast(){
+  const D = S.d[S.sel]; if (!chart || !D) return;
+  const k = D.k[S.tab], s = D.ser[S.tab], i = k.length-1, b = k[i], t = ts(b.t);
+  cs.update({time:t, open:b.o, high:b.h, low:b.l, close:b.c});
+  if (isFinite(s.e20[i])) l20.update({time:t, value:s.e20[i]});
+  if (isFinite(s.e50[i])) l50.update({time:t, value:s.e50[i]});
+  if (isFinite(s.e200[i])) l200.update({time:t, value:s.e200[i]});
+}
+function drawPlanLines(c){
+  if (!cs) return;
+  const lines = [];
+  if (c && !c.invalid){ lines.push([c.entry, tok('--text-2'), '계획 진입'], [c.stop, tok('--short'), '계획 손절'], [c.tp2, tok('--long'), '계획 목표']); }
+  for (const j of S.journal) if (j.status === 'open' && j.sym === S.sel) lines.push([j.entry, tok('--accent'), '보유 진입'], [j.stop, tok('--short'), '보유 손절'], [j.target, tok('--long'), '보유 목표']);
+  const key = lines.map(l => l[0].toPrecision(8) + l[2]).join('|'); if (key === planKey) return; planKey = key;
+  planLines.forEach(l => cs.removePriceLine(l));
+  planLines = lines.map(([price, color, title]) => cs.createPriceLine({price, color, lineWidth:1, lineStyle:2, axisLabelVisible:true, title}));
+}
+function selectSym(sym){
+  S.sel = sym;
+  document.querySelectorAll('.card').forEach(c => { const on = c.dataset.s === sym; c.classList.toggle('sel', on); c.querySelector('.pick').setAttribute('aria-pressed', on); });
+  if (S.plan.stopAuto) S.plan.stop = null;
+  if (!S.plan.entryAuto){ S.plan.entryAuto = true; }
+  drawChart(); renderPlanner(true);
+}
+
+/* ================= 이벤트 ================= */
+$('#tabs').addEventListener('click', e => { const t = e.target.closest('[data-tf]'); if (t) switchTab(t.dataset.tf); });
+$('#tabs').addEventListener('keydown', e => {
+  const n = TFS.findIndex(t => t.key === S.tab), d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+  if (!d) return; e.preventDefault(); switchTab(TFS[(n + d + TFS.length) % TFS.length].key); $(`#tab-${S.tab}`).focus();
+});
+$('#cards').addEventListener('click', e => {
+  const rm = e.target.closest('[data-rm]')?.dataset.rm;
+  if (rm){
+    if (S.journal.some(j => j.status === 'open' && j.sym === rm) && !confirm(`${rm.replace(/USDT$/,'')}는 보유 중이에요. 삭제하면 이 종목의 손절·목표 감시도 멈춥니다. 삭제할까요?`)) return;
+    S.symbols =S.symbols.filter(s => s !== rm); store.set('cs_syms', S.symbols);
+    subscribe([rm], 'unsubscribe'); delete S.d[rm];
+    if (S.sel === rm) S.sel = S.symbols[0];
+    renderCards(); drawChart(); renderPlanner(true); renderPaper(); toast(`${rm} 추적을 멈췄습니다`, 'x'); return;
+  }
+  const pick = e.target.closest('[data-pick]')?.dataset.pick; if (pick) selectSym(pick);
+});
+$('#addForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  let s = $('#addIn').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,''); if (!s){ $('#addIn').focus(); return; }
+  if (!s.endsWith('USDT')) s += 'USDT';
+  if (S.symbols.includes(s)){ toast(`${s}는 이미 추적 중입니다`); return; }
+  const btn = $('#addBtn'), lbl = btn.querySelector('span'); btn.disabled = true; lbl.textContent = '확인 중…';
+  try{
+    await loadSymbol(s);
+    S.symbols.push(s); store.set('cs_syms', S.symbols); subscribe([s]);
+    $('#addIn').value = ''; renderCards(); renderTabs(); renderPaper(); toast(`${s} 추가됨`, 'plus');
+  }catch(err){ toast(`${s}를 찾지 못했어요. Bybit 선물 심볼인지 확인해 주세요`, 'alert'); }
+  finally{ btn.disabled = false; lbl.textContent = '추가'; }
+});
+// 계획 입력
+$('#plLong').onclick = () => { S.plan.dir = 'long'; if (S.plan.stopAuto) S.plan.stop = null; renderPlanner(true); };
+$('#plShort').onclick = () => { S.plan.dir = 'short'; if (S.plan.stopAuto) S.plan.stop = null; renderPlanner(true); };
+$('#plEntry').oninput = e => { S.plan.entryAuto = false; S.plan.entry = num(e.target.value); renderPlanner(); };
+$('#plStop').oninput = e => { S.plan.stopAuto = false; S.plan.stop = num(e.target.value); renderPlanner(); };
+$('#plTp').oninput = e => { S.plan.tp = num(e.target.value); renderPlanner(); };
+$('#plLev').oninput = e => { S.plan.lev = Math.round(num(e.target.value)); renderPlanner(); };
+$('#plNote').oninput = e => { S.plan.note = e.target.value; renderPlanner(); };
+document.querySelector('.pl').addEventListener('click', e => {
+  const q = e.target.closest('[data-q]')?.dataset.q; if (!q) return;
+  if (q === 'now'){ S.plan.entryAuto = true; if (S.plan.stopAuto) S.plan.stop = null; }
+  else { S.plan.stopAuto = q; S.plan.stop = null; }
+  renderPlanner(true);
+});
+$('#plSave').onclick = saveTrade;
+const acctIn = (id, key, round) => { $(id).oninput = e => { const v = num(e.target.value); if (v > 0){ S.acct[key] = round ? Math.round(v) : v; store.set('cs_acct', S.acct); renderPlanner(); renderJournal(); } }; };
+acctIn('#acBal', 'bal'); acctIn('#acRisk', 'risk'); acctIn('#acDay', 'day'); acctIn('#acMax', 'max', true);
+$('#acSound').onclick = () => { S.acct.sound = !S.acct.sound; store.set('cs_acct', S.acct); $('#acSound').setAttribute('aria-checked', S.acct.sound); if (S.acct.sound) beep('target'); };
+// 일지
+$('#jBody').addEventListener('click', e => {
+  const cid = e.target.closest('[data-close]')?.dataset.close, did = e.target.closest('[data-del]')?.dataset.del;
+  if (cid){ const j = S.journal.find(x => String(x.id) === cid); if (j){ S.queue.unshift({type:'close', j}); showNext(); } }
+  if (did && confirm('이 기록을 지울까요? 손익 통계에서도 빠집니다.')){ S.journal = S.journal.filter(x => String(x.id) !== did); saveJournal(); renderJournal(); renderPlanner(); S.symbols.forEach(updateCard); drawPlanLines(planCalc()); }
+});
+$('#ov').addEventListener('click', e => { if (e.target.id === 'ov') showNext(); });
+// 화면 곳곳의 ? 버튼과 점선 밑줄 용어 → 설명 팝업 (팝업 안의 링크는 팝업이 직접 처리)
+document.addEventListener('click', e => {
+  const h = e.target.closest('[data-help]'); if (!h || h.closest('#modal')) return;
+  e.preventDefault(); showHelp(h.dataset.help);
+});
+document.addEventListener('keydown', e => {
+  if (!S.modalOpen) return;
+  if (e.key === 'Escape') showNext();
+  if (e.key === 'Enter' && e.target.id === 'mExit') $('#modal [data-act="save"]').click();
+  if (e.key === 'Tab'){
+    const f = [...$('#modal').querySelectorAll('button, input')]; if (!f.length) return;
+    const i = f.indexOf(document.activeElement);
+    if (e.shiftKey && i <= 0){ e.preventDefault(); f[f.length-1].focus(); }
+    else if (!e.shiftKey && i === f.length-1){ e.preventDefault(); f[0].focus(); }
+  }
+});
+document.addEventListener('click', () => { try{ actx = actx || new AudioContext(); actx.resume(); }catch(e){} }, {once:true});
+
+function syncNotiBtn(){
+  const b = $('#notiBtn');
+  if (!('Notification' in window)){ b.innerHTML = icon('bell-off') + '<span class="lbl">알림 미지원</span>'; b.disabled = true; return; }
+  const p = Notification.permission;
+  b.innerHTML = icon(p === 'denied' ? 'bell-off' : 'bell') + `<span class="lbl">${p === 'granted' ? '알림 켜짐' : p === 'denied' ? '알림 차단됨' : '브라우저 알림 켜기'}</span>`;
+  b.setAttribute('aria-pressed', p === 'granted');
+  b.title = p === 'denied' ? '주소창 왼쪽 사이트 설정에서 알림을 허용해 주세요' : '보유 중인 매매가 손절·목표가에 닿으면 윈도우 알림으로 표시';
+}
+$('#notiBtn').onclick = async () => {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted'){ toast('알림이 이미 켜져 있어요', 'bell'); return; }
+  if (Notification.permission === 'denied'){ toast('주소창 왼쪽 사이트 설정에서 알림을 허용해 주세요', 'bell-off'); return; }
+  await Notification.requestPermission(); syncNotiBtn();
+};
+syncNotiBtn();
+// 권한이 있어도 윈도우 방해 금지·집중 지원이 켜져 있으면 알림이 안 뜰 수 있어 직접 확인하게 한다
+$('#notiTest').onclick = () => {
+  beep('target');
+  if (!('Notification' in window)){ toast('이 브라우저는 알림을 지원하지 않아요 — 소리와 화면 팝업으로만 알려요', 'bell-off'); return; }
+  if (Notification.permission !== 'granted'){ toast('먼저 "브라우저 알림 켜기"를 눌러 허용해 주세요. 소리는 지금처럼 납니다', 'bell'); return; }
+  try{ new Notification('테스트 알림 — 코인 매매 계획판', {body:'이 알림이 보이면 손절·목표가 도달 알림도 이렇게 표시됩니다.', tag:'test'}); }catch(e){}
+  toast('윈도우 알림이 안 보이면 방해 금지·집중 지원 설정이나 크롬 알림 설정을 확인하세요', 'bell');
+};
+$('#watch').onclick = () => showHelp('watch');
+setInterval(renderWatch, 1000);
+renderWatch();
+
+function tickCountdown(){
+  const ms = IV_MS[S.tab] - Date.now() % IV_MS[S.tab], sec = Math.floor(ms/1000);
+  const h = Math.floor(sec/3600), m = Math.floor(sec/60) % 60, s = sec % 60, p2 = x => String(x).padStart(2,'0');
+  $('#cdLabel').textContent = BAR_NAME[S.tab];
+  $('#countdown').textContent = h ? `${h}:${p2(m)}:${p2(s)}` : `${m}:${p2(s)}`;
+}
+setInterval(tickCountdown, 1000);
+setInterval(() => renderTabs(), 60000);
+
+/* ================= 시작 ================= */
+(async function init(){
+  initChart(); renderTabs(); renderCards(); renderJournal(); drawChart(); tickCountdown(); renderPlanner(true);
+  const results = await Promise.allSettled(S.symbols.map(loadSymbol));
+  const failed = S.symbols.filter((s,i) => results[i].status === 'rejected');
+  if (failed.length){
+    console.error(results.filter(r => r.status === 'rejected').map(r => r.reason));
+    toast(failed.length === S.symbols.length ? 'Bybit 시세를 불러오지 못했어요. 인터넷 연결을 확인해 주세요' : `불러오기 실패: ${failed.join(', ')}`, 'alert');
+    S.symbols = S.symbols.filter(s => !failed.includes(s));
+    if (!S.symbols.includes(S.sel)) S.sel = S.symbols[0];
+  }
+  savePaper();
+  renderTabs(); renderCards(); drawChart(); renderPlanner(true); renderJournal(); renderPaper();
+  S.symbols.forEach(checkTrades);
+  connectWS();
+})();
+</script>
+</body>
+</html>
