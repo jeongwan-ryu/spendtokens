@@ -1,0 +1,11 @@
+{
+  "name": "ros-log-doctor",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "build": "node build-browser.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check:build": "node build-browser.mjs --check"
+  }
+}
