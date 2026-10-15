@@ -26,7 +26,7 @@
 }
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--text);font-family:"Pretendard Variable",Pretendard,"Malgun Gothic",system-ui,sans-serif;font-size:14px;line-height:1.45;letter-spacing:-.005em;-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Pretendard Variable",Pretendard,"Malgun Gothic","Noto Sans CJK KR",system-ui,sans-serif;font-size:14px;line-height:1.45;letter-spacing:-.005em;-webkit-font-smoothing:antialiased}
 button,input{font:inherit;color:inherit}
 button{cursor:pointer}
 ::selection{background:rgba(245,165,36,.32);color:#fff}
@@ -359,7 +359,7 @@ details.acct[open] summary{margin-bottom:12px}
   <div class="controls">
     <span class="cond">페이지가 열려 있고 시세가<br>들어오는 동안만 감시해요</span>
     <button class="btn" id="notiBtn" aria-pressed="false"><svg class="ic"><use href="#i-bell"/></svg><span class="lbl">브라우저 알림</span></button>
-    <button class="btn" id="notiTest" title="윈도우 알림이 실제로 뜨는지 확인"><svg class="ic"><use href="#i-check"/></svg><span class="lbl">테스트 알림</span></button>
+    <button class="btn" id="notiTest" title="시스템 알림이 실제로 뜨는지 확인"><svg class="ic"><use href="#i-check"/></svg><span class="lbl">테스트 알림</span></button>
   </div>
   <nav class="tabs" id="tabs" role="tablist" aria-label="봉 단위"></nav>
 </header>
@@ -428,7 +428,7 @@ details.acct[open] summary{margin-bottom:12px}
             <div class="f"><div class="lab"><label for="acMax">동시 보유 한도</label><button type="button" class="q" data-help="max" aria-label="동시 보유 한도 설명">?</button></div><div class="inp"><input id="acMax" inputmode="numeric"><span>개</span></div></div>
           </div>
           <div class="set-row" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:13px"><span>손절·목표 도달 알림음</span><button class="switch" id="acSound" role="switch" aria-checked="true" aria-label="손절·목표 도달 알림음"></button></div>
-          <div class="set-row" style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;font-size:13px"><span>변동성 급등 알림 (소리·윈도우 알림)</span><button class="switch" id="acVol" role="switch" aria-checked="true" aria-label="변동성 급등 알림"></button></div>
+          <div class="set-row" style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;font-size:13px"><span>변동성 급등 알림 (소리·시스템 알림)</span><button class="switch" id="acVol" role="switch" aria-checked="true" aria-label="변동성 급등 알림"></button></div>
         </details>
       </div>
     </section>
@@ -541,7 +541,9 @@ function regimeAt(D, tf, i){
   let state = 'rest';
   if (er >= REGIME.er && slope >= REGIME.slope && hT >= 0 && c > s.e50[i]) state = 'up';
   else if (er >= REGIME.er && slope <= -REGIME.slope && hT <= 0 && c < s.e50[i]) state = 'down';
-  return {state, er, slope, vol, hT};
+  // ponytail: 방향 = 최근 3봉 종가 변화. 긴 꼬리만 있고 종가가 제자리면 방향이 약하게 잡힘 — 필요하면 봉별 고가·저가 이동으로 바꿀 것
+  const vdir = c >= k[i-3].c ? 1 : -1;
+  return {state, er, slope, vol, vdir, hT};
 }
 // 마감된 마지막 봉 기준 (진행 중인 봉으로 상태가 깜빡이지 않게)
 const liveRegime = (D, tf) => regimeAt(D, tf, D.k[tf].length-2);
@@ -855,11 +857,12 @@ function updateCard(sym){
   el.title = regimeReason(r, S.tab);
   q('state').className = 'chip ' + r.state; q('state').textContent = STATE_NAME[r.state];
   q('vol').hidden = !(r.vol >= REGIME.vol);
+  q('vol').innerHTML = `변동성 급등 <b class="${r.vdir > 0 ? 'up' : 'dn'}">${r.vdir > 0 ? '▲ 상승' : '▼ 하락'}</b>`;
   q('erv').textContent = r.er.toFixed(2);
   q('erb').style.width = Math.min(100, r.er*100) + '%'; q('erb').className = r.state === 'rest' ? '' : r.state;
   q('slope').textContent = signed(r.slope, 2); q('slope').className = Math.abs(r.slope) < REGIME.slope ? '' : r.slope > 0 ? 'up' : 'dn';
   q('ht').textContent = r.hT > 0 ? '상승' : r.hT < 0 ? '하락' : '횡보'; q('ht').className = r.hT > 0 ? 'up' : r.hT < 0 ? 'dn' : '';
-  q('volr').textContent = r.vol.toFixed(1) + '배'; q('volr').className = r.vol >= REGIME.vol ? 'wn' : '';
+  q('volr').textContent = r.vol.toFixed(1) + '배' + (r.vol >= REGIME.vol ? (r.vdir > 0 ? ' ▲' : ' ▼') : ''); q('volr').className = r.vol >= REGIME.vol ? 'wn' : '';
 }
 
 const pending = new Set(); let refreshQueued = false;
@@ -1079,7 +1082,7 @@ const HELP = {
       <ol><li>이 페이지(탭)가 열려 있어야 해요. 다른 탭을 봐도 되지만, 탭을 닫거나 PC가 절전·잠금 상태면 멈춰요.</li>
       <li>시세가 들어와야 해요. ${LAG_MS/1000}초 넘게 안 들어오면 <b class="wn">지연</b>, ${STALE_MS/1000}초 넘으면 <b class="dn">감시 중단</b>으로 바뀌고 자동으로 다시 연결해요.</li>
       <li>끊겼다가 돌아오면 그 사이 1분봉의 고가·저가로 손절·목표가를 지났는지 다시 확인해 알려 드려요.${S.gaps.length ? ` 최근 끊김: ${S.gaps.map(g => `${fmtTime(g.from)}~${fmtTime(g.to)}`).join(', ')}` : ''}</li>
-      <li>윈도우 알림은 권한이 있어도 방해 금지·집중 지원이 켜져 있으면 안 뜰 수 있어요. 위의 <b>테스트 알림</b>으로 확인하세요.</li></ol>
+      <li>시스템 알림은 권한이 있어도 방해 금지·집중 모드이 켜져 있으면 안 뜰 수 있어요. 위의 <b>테스트 알림</b>으로 확인하세요.</li></ol>
       <p class="caveat">이 페이지는 거래소의 손절 주문을 대신하지 못해요. 실제 손절은 거래소에 스탑 주문으로 걸어 두고, 이 알림은 보조로 쓰세요.</p>`; }},
   regime: {t:'추세 구간과 쉬는 구간', sub:'"방향이 없는 구간에서는 쉰다"는 원칙을 숫자로 옮긴 기준이에요.',
     b: () => { const D = S.d[S.sel], r = D && liveRegime(D, S.tab), HB = BAR_NAME[TF[S.tab].higher];
@@ -1100,7 +1103,7 @@ const HELP = {
     b: () => `<p>${TFS.map(t => `${t.label} 탭 → ${BAR_NAME[t.higher]}`).join(' · ')}을 봅니다. 상위 봉에서 가격이 EMA50 위이고 EMA20도 EMA50 위면 <b class="up">상승</b>, 둘 다 아래면 <b class="dn">하락</b>, 섞여 있으면 횡보예요.</p>
       <p>큰 흐름을 거스르는 매매를 거르기 위한 확인이에요. 상위 봉이 하락인데 짧은 봉에서 롱을 잡으면 "원칙 확인"에서 경고가 나옵니다.</p>` },
   vol: {t:'변동성', sub:'최근 한 봉의 변동폭(ATR)이 지난 100봉 평균의 몇 배인지예요.',
-    b: () => `<p>1.0배면 평소와 같고, ${REGIME.vol}배 이상이면 카드에 <span class="chip vol">변동성 급등</span>이 붙고, 지금 보는 봉 단위에서 기준을 새로 넘는 순간 소리·윈도우 알림으로 한 번 알려 드려요(설정에서 끌 수 있어요).</p>
+    b: () => `<p>1.0배면 평소와 같고, ${REGIME.vol}배 이상이면 카드에 <span class="chip vol">변동성 급등</span>이 붙고(옆의 <b class="up">▲ 상승</b> / <b class="dn">▼ 하락</b>은 최근 3봉 동안 가격이 오른 쪽인지 내린 쪽인지예요), 지금 보는 봉 단위에서 기준을 새로 넘는 순간 소리·시스템 알림으로 한 번 알려 드려요(설정에서 끌 수 있어요).</p>
       <p>변동성이 클 때는 손절가에 정확히 체결되지 않고 더 불리하게 밀리기 쉬워요(미끄러짐). 같은 계좌 위험이면 손절 폭이 넓어져 수량도 줄여야 합니다.</p>` },
   oi: {t:'미결제약정 (OI)', sub:'아직 정리되지 않고 열려 있는 선물 포지션의 총량이에요.',
     b: () => `<p>카드에는 최근 4봉 동안의 OI 변화율을 보여 줘요. 가격과 함께 보면 누가 움직이는지 짐작할 수 있어요.</p>
@@ -1202,12 +1205,12 @@ function checkVol(sym){
   const k = D.k[S.tab], t = k[k.length-2]?.t, hot = r.vol >= REGIME.vol, prev = volSeen[sym];
   volSeen[sym] = {tf:S.tab, t, hot};
   if (!prev || prev.tf !== S.tab || prev.t === t || prev.hot || !hot || !S.acct.volAlert) return;
-  alertVol(sym, r.vol);
+  alertVol(sym, r.vol, r.vdir);
 }
-function alertVol(sym, v){
+function alertVol(sym, v, dir){
   beep('vol', true);
   const name = sym.replace(/USDT$/,''), held = S.journal.some(j => j.status === 'open' && j.sym === sym);
-  const title = `${name} 변동성 급등 (${BAR_NAME[S.tab]} ${v.toFixed(1)}배)`;
+  const title = `${name} 변동성 급등 ${dir > 0 ? '▲ 상승' : '▼ 하락'} (${BAR_NAME[S.tab]} ${v.toFixed(1)}배)`;
   if ('Notification' in window && Notification.permission === 'granted'){
     try{ const n = new Notification(title, {body: `평소 변동폭의 ${v.toFixed(1)}배예요. 손절가가 밀려 체결될 수 있으니 ${held ? '보유 포지션을 확인하세요.' : '진입은 수량을 줄이거나 쉬세요.'}`, tag:'vol'+sym+S.tab}); n.onclick = () => { window.focus(); n.close(); }; }catch(e){}
   }
@@ -1422,7 +1425,7 @@ function syncNotiBtn(){
   const p = Notification.permission;
   b.innerHTML = icon(p === 'denied' ? 'bell-off' : 'bell') + `<span class="lbl">${p === 'granted' ? '알림 켜짐' : p === 'denied' ? '알림 차단됨' : '브라우저 알림 켜기'}</span>`;
   b.setAttribute('aria-pressed', p === 'granted');
-  b.title = p === 'denied' ? '주소창 왼쪽 사이트 설정에서 알림을 허용해 주세요' : '보유 중인 매매가 손절·목표가에 닿으면 윈도우 알림으로 표시';
+  b.title = p === 'denied' ? '주소창 왼쪽 사이트 설정에서 알림을 허용해 주세요' : '보유 중인 매매가 손절·목표가에 닿으면 시스템 알림으로 표시';
 }
 $('#notiBtn').onclick = async () => {
   if (!('Notification' in window)) return;
@@ -1431,13 +1434,13 @@ $('#notiBtn').onclick = async () => {
   await Notification.requestPermission(); syncNotiBtn();
 };
 syncNotiBtn();
-// 권한이 있어도 윈도우 방해 금지·집중 지원이 켜져 있으면 알림이 안 뜰 수 있어 직접 확인하게 한다
+// 권한이 있어도 OS 방해 금지·집중 모드이 켜져 있으면 알림이 안 뜰 수 있어 직접 확인하게 한다
 $('#notiTest').onclick = () => {
   beep('target');
   if (!('Notification' in window)){ toast('이 브라우저는 알림을 지원하지 않아요 — 소리와 화면 팝업으로만 알려요', 'bell-off'); return; }
   if (Notification.permission !== 'granted'){ toast('먼저 "브라우저 알림 켜기"를 눌러 허용해 주세요. 소리는 지금처럼 납니다', 'bell'); return; }
   try{ new Notification('테스트 알림 — 코인 매매 계획판', {body:'이 알림이 보이면 손절·목표가 도달 알림도 이렇게 표시됩니다.', tag:'test'}); }catch(e){}
-  toast('윈도우 알림이 안 보이면 방해 금지·집중 지원 설정이나 크롬 알림 설정을 확인하세요', 'bell');
+  toast('시스템 알림이 안 보이면 방해 금지·집중 모드 설정이나 크롬 알림 설정을 확인하세요', 'bell');
 };
 $('#watch').onclick = () => showHelp('watch');
 setInterval(renderWatch, 1000);
