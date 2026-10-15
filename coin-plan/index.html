@@ -428,6 +428,7 @@ details.acct[open] summary{margin-bottom:12px}
             <div class="f"><div class="lab"><label for="acMax">동시 보유 한도</label><button type="button" class="q" data-help="max" aria-label="동시 보유 한도 설명">?</button></div><div class="inp"><input id="acMax" inputmode="numeric"><span>개</span></div></div>
           </div>
           <div class="set-row" style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:13px"><span>손절·목표 도달 알림음</span><button class="switch" id="acSound" role="switch" aria-checked="true" aria-label="손절·목표 도달 알림음"></button></div>
+          <div class="set-row" style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;font-size:13px"><span>변동성 급등 알림 (소리·윈도우 알림)</span><button class="switch" id="acVol" role="switch" aria-checked="true" aria-label="변동성 급등 알림"></button></div>
         </details>
       </div>
     </section>
@@ -487,7 +488,7 @@ const store = {
 const S = {
   symbols: store.get('cs_syms', DEFAULT_SYMS),
   tab: TF[store.get('cs_tab', '15')] ? store.get('cs_tab', '15') : '15',
-  acct: {bal:1000, risk:1, day:3, max:2, sound:true, ...store.get('cs_acct', {})},
+  acct: {bal:1000, risk:1, day:3, max:2, sound:true, volAlert:true, ...store.get('cs_acct', {})},
   plan: {dir:'long', entry:null, entryAuto:true, stop:null, stopAuto:'swing', tp:2, lev:5, note:''},
   journal: store.get('cs_journal', []),
   paper: store.get('cs_paper', []),
@@ -869,7 +870,7 @@ function scheduleRefresh(sym){
     refreshQueued = false;
     for (const s of pending){
       const D = S.d[s]; if (!D) continue;
-      refreshSeries(D); updateCard(s); checkTrades(s);
+      refreshSeries(D); updateCard(s); checkTrades(s); checkVol(s);
       if (s === S.sel){ updateChartLast(); renderPlanner(); }
     }
     pending.clear(); renderSummary(); renderJournalLive();
@@ -951,7 +952,7 @@ function renderPlanner(syncInputs){
   if (P.entryAuto || syncInputs) setIn('#plEntry', raw(c.entry));
   if (P.stopAuto || syncInputs) setIn('#plStop', raw(c.stop));
   if (syncInputs){ setIn('#plTp', P.tp); setIn('#plLev', P.lev); setIn('#plNote', P.note);
-    setIn('#acBal', A.bal); setIn('#acRisk', A.risk); setIn('#acDay', A.day); setIn('#acMax', A.max); $('#acSound').setAttribute('aria-checked', A.sound); }
+    setIn('#acBal', A.bal); setIn('#acRisk', A.risk); setIn('#acDay', A.day); setIn('#acMax', A.max); $('#acSound').setAttribute('aria-checked', A.sound); $('#acVol').setAttribute('aria-checked', A.volAlert); }
   if (c.invalid){
     $('#plOut').innerHTML = ''; $('#plChecks').innerHTML = '';
     $('#plWrong').innerHTML = `<h3>${icon('alert')}계획을 완성해 주세요</h3><p>${esc(c.invalid)}</p>`;
@@ -1099,7 +1100,7 @@ const HELP = {
     b: () => `<p>${TFS.map(t => `${t.label} 탭 → ${BAR_NAME[t.higher]}`).join(' · ')}을 봅니다. 상위 봉에서 가격이 EMA50 위이고 EMA20도 EMA50 위면 <b class="up">상승</b>, 둘 다 아래면 <b class="dn">하락</b>, 섞여 있으면 횡보예요.</p>
       <p>큰 흐름을 거스르는 매매를 거르기 위한 확인이에요. 상위 봉이 하락인데 짧은 봉에서 롱을 잡으면 "원칙 확인"에서 경고가 나옵니다.</p>` },
   vol: {t:'변동성', sub:'최근 한 봉의 변동폭(ATR)이 지난 100봉 평균의 몇 배인지예요.',
-    b: () => `<p>1.0배면 평소와 같고, ${REGIME.vol}배 이상이면 카드에 <span class="chip vol">변동성 급등</span>이 붙어요.</p>
+    b: () => `<p>1.0배면 평소와 같고, ${REGIME.vol}배 이상이면 카드에 <span class="chip vol">변동성 급등</span>이 붙고, 지금 보는 봉 단위에서 기준을 새로 넘는 순간 소리·윈도우 알림으로 한 번 알려 드려요(설정에서 끌 수 있어요).</p>
       <p>변동성이 클 때는 손절가에 정확히 체결되지 않고 더 불리하게 밀리기 쉬워요(미끄러짐). 같은 계좌 위험이면 손절 폭이 넓어져 수량도 줄여야 합니다.</p>` },
   oi: {t:'미결제약정 (OI)', sub:'아직 정리되지 않고 열려 있는 선물 포지션의 총량이에요.',
     b: () => `<p>카드에는 최근 4봉 동안의 OI 변화율을 보여 줘요. 가격과 함께 보면 누가 움직이는지 짐작할 수 있어요.</p>
@@ -1171,11 +1172,11 @@ const HELP = {
 
 /* ================= 알림 · 팝업 ================= */
 let actx;
-function beep(kind){
-  if (!S.acct.sound) return;
+function beep(kind, force){
+  if (!S.acct.sound && !force) return;
   try{
     actx = actx || new AudioContext(); if (actx.state === 'suspended') actx.resume();
-    const tones = kind === 'target' ? [660, 880, 1100] : [880, 660, 440];
+    const tones = kind === 'target' ? [660, 880, 1100] : kind === 'vol' ? [990, 990, 990, 990] : [880, 660, 440];
     tones.forEach((fq, n) => {
       const o = actx.createOscillator(), g = actx.createGain(), st = actx.currentTime + n*0.16;
       o.type = 'sine'; o.frequency.value = fq; o.connect(g); g.connect(actx.destination);
@@ -1191,6 +1192,26 @@ function alertTrade(j, kind, gap){
     try{ const n = new Notification((kind === 'stop' ? `${name} 손절가 도달` : `${name} 목표가 도달`) + gapTxt, {body: kind === 'stop' ? `계획한 손절가 ${fmt(j.stop)}에 닿았습니다. 계획대로 정리하세요.` : `목표가 ${fmt(j.target)}에 닿았습니다.`, tag:'j'+j.id+kind, requireInteraction:true}); n.onclick = () => { window.focus(); n.close(); }; }catch(e){}
   }
   S.queue.push({type:kind, j, gap}); if (!S.modalOpen) showNext();
+}
+// 변동성 급등: 지금 보는 탭에서 마감된 봉의 변동성이 기준(REGIME.vol) 아래 → 이상으로 바뀌는 순간 한 번 알린다.
+// 탭을 바꾸거나 페이지를 처음 열었을 때는 현재 상태만 기록하고 알리지 않는다(이미 급등 중인 코인이 한꺼번에 울리지 않게).
+const volSeen = {};
+function checkVol(sym){
+  const D = S.d[sym]; if (!D || !D.k[S.tab]) return;
+  const r = liveRegime(D, S.tab); if (!r || !isFinite(r.vol)) return;
+  const k = D.k[S.tab], t = k[k.length-2]?.t, hot = r.vol >= REGIME.vol, prev = volSeen[sym];
+  volSeen[sym] = {tf:S.tab, t, hot};
+  if (!prev || prev.tf !== S.tab || prev.t === t || prev.hot || !hot || !S.acct.volAlert) return;
+  alertVol(sym, r.vol);
+}
+function alertVol(sym, v){
+  beep('vol', true);
+  const name = sym.replace(/USDT$/,''), held = S.journal.some(j => j.status === 'open' && j.sym === sym);
+  const title = `${name} 변동성 급등 (${BAR_NAME[S.tab]} ${v.toFixed(1)}배)`;
+  if ('Notification' in window && Notification.permission === 'granted'){
+    try{ const n = new Notification(title, {body: `평소 변동폭의 ${v.toFixed(1)}배예요. 손절가가 밀려 체결될 수 있으니 ${held ? '보유 포지션을 확인하세요.' : '진입은 수량을 줄이거나 쉬세요.'}`, tag:'vol'+sym+S.tab}); n.onclick = () => { window.focus(); n.close(); }; }catch(e){}
+  }
+  toast(title + (held ? ' — 보유 중인 종목이에요' : ''), 'alert');
 }
 let lastFocus = null;
 function openOverlay(){
@@ -1369,6 +1390,7 @@ $('#plSave').onclick = saveTrade;
 const acctIn = (id, key, round) => { $(id).oninput = e => { const v = num(e.target.value); if (v > 0){ S.acct[key] = round ? Math.round(v) : v; store.set('cs_acct', S.acct); renderPlanner(); renderJournal(); } }; };
 acctIn('#acBal', 'bal'); acctIn('#acRisk', 'risk'); acctIn('#acDay', 'day'); acctIn('#acMax', 'max', true);
 $('#acSound').onclick = () => { S.acct.sound = !S.acct.sound; store.set('cs_acct', S.acct); $('#acSound').setAttribute('aria-checked', S.acct.sound); if (S.acct.sound) beep('target'); };
+$('#acVol').onclick = () => { S.acct.volAlert = !S.acct.volAlert; store.set('cs_acct', S.acct); $('#acVol').setAttribute('aria-checked', S.acct.volAlert); if (S.acct.volAlert) beep('vol', true); };
 // 일지
 $('#jBody').addEventListener('click', e => {
   const cid = e.target.closest('[data-close]')?.dataset.close, did = e.target.closest('[data-del]')?.dataset.del;
